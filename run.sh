@@ -37,6 +37,7 @@ for g in "${GATES[@]}"; do
 done
 time_limit="$(printf '%02d:%02d:00' $((minutes / 60)) $((minutes % 60)))"
 
+echo "Slurm account: $SLURM_ACCOUNT"
 mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
 echo "Submitting ONE job on ONE $(wf_cfg slurm.gpu_constraint): ${GATES[*]}  (${cpus} CPUs, ${mem}G RAM, ${time_limit})"

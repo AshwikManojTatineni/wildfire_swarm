@@ -21,14 +21,11 @@ Clone into your home directory. Torch backs up `$HOME`, but `/scratch` is not ba
 cd $HOME
 git clone <your-repo-url> wildfire
 cd wildfire
-cp config/torch.env.example config/torch.env
-my_slurm_accounts                     # lists your accounts, e.g. torch_pr_123_abc
-sed -i 's/^SLURM_ACCOUNT=.*/SLURM_ACCOUNT=torch_pr_123_abc/' config/torch.env   # use your own account
-grep SLURM_ACCOUNT config/torch.env   # check it
 ```
 
-Until `SLURM_ACCOUNT` is set, `./install.sh` stops with
-`wf_env: set SLURM_ACCOUNT in config/torch.env (see my_slurm_accounts)`.
+There is nothing to configure. The scripts use your first Slurm account (the one `my_slurm_accounts`
+lists) and print it when they submit (`Slurm account: ...`). To use a different account, set
+`SLURM_ACCOUNT` in `config/torch.env`, which is created automatically on the first run.
 
 Any folder name works for the clone, because the scripts find the repo from their own location. The paths
 below assume `~/wildfire`.

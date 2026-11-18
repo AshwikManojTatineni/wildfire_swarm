@@ -10,15 +10,17 @@ if [[ ! -e "$_wf_here/.git" ]]; then
   echo "  git clone <your-repo-url> <folder>" >&2
   return 2 2>/dev/null || exit 2
 fi
-if [[ -f "$_wf_here/config/torch.env" ]]; then
-  # shellcheck disable=SC1091
-  source "$_wf_here/config/torch.env"
-else
-  echo "wf_env: missing $_wf_here/config/torch.env (copy config/torch.env.example)" >&2
-  return 2 2>/dev/null || exit 2
-fi
+# Optional overrides; created from the example on first use, so no manual copy is needed.
+[[ -f "$_wf_here/config/torch.env" ]] || cp "$_wf_here/config/torch.env.example" "$_wf_here/config/torch.env"
+# shellcheck disable=SC1091
+source "$_wf_here/config/torch.env"
+# Slurm account: the one set in torch.env, else inside a job the job's own account, else the
+# first account Slurm lists for this user (what `my_slurm_accounts` shows).
 if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; then
-  echo "wf_env: set SLURM_ACCOUNT in config/torch.env (see my_slurm_accounts)" >&2
+  SLURM_ACCOUNT="${SLURM_JOB_ACCOUNT:-$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | awk 'NF' | head -n 1)}"
+fi
+if [[ -z "${SLURM_ACCOUNT:-}" ]]; then
+  echo "wf_env: no Slurm account found for $USER (my_slurm_accounts lists none)" >&2
   return 2 2>/dev/null || exit 2
 fi
 

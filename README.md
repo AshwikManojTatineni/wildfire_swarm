@@ -16,7 +16,7 @@ wildfire_swarm/
 ├── config/
 │   ├── runtime.yaml                # image/Pegasus pins, rates, DDS, Slurm sizes
 │   ├── mission.yaml                # forest, corridor, spawns, robots, video
-│   └── torch.env.example           # Slurm account and paths (copy to torch.env)
+│   └── torch.env.example           # optional overrides (account, scratch path, e-mail)
 ├── containers/
 │   ├── isaac_pegasus.def           # Isaac Sim 5.1.0 + Pegasus v5.1.0
 │   ├── humble_ws.def               # ROS 2 Humble + Nav2, robot_localization, rtabmap_odom
@@ -34,8 +34,7 @@ wildfire_swarm/
 Clone into your home directory: code belongs in backed-up `$HOME`, and large data goes to `/scratch`.
 
 ```bash
-cd $HOME && git clone <your-repo-url> wildfire && cd wildfire
-cp config/torch.env.example config/torch.env    # set SLURM_ACCOUNT (see my_slurm_accounts)
+cd $HOME && git clone <your-repo-url> wildfire && cd wildfire   # no config needed: account auto-detected
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
 ./run.sh                                        # ONE job on ONE L40S: g1_startup -> g3_scene
 ```
