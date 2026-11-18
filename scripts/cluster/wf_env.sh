@@ -17,7 +17,8 @@ if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; the
 fi
 
 export SLURM_ACCOUNT
-export WF_REPO="${WF_REPO:-$_wf_here}"
+# The repo is wherever this checkout lives (any folder name); torch.env does not set it.
+export WF_REPO="$_wf_here"
 export WF_SCRATCH="${WF_SCRATCH:-/scratch/$USER/wildfire_work}"
 export WF_CFG="$WF_REPO/config/runtime.yaml"
 wf_cfg() { python3 "$WF_REPO/scripts/cluster/cfg.py" "$WF_CFG" "$1"; }

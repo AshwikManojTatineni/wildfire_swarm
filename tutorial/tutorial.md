@@ -22,8 +22,16 @@ cd $HOME
 git clone <your-repo-url> wildfire
 cd wildfire
 cp config/torch.env.example config/torch.env
-my_slurm_accounts                     # copy your torch_pr_... account into config/torch.env
+my_slurm_accounts                     # lists your accounts, e.g. torch_pr_123_abc
+sed -i 's/^SLURM_ACCOUNT=.*/SLURM_ACCOUNT=torch_pr_123_abc/' config/torch.env   # use your own account
+grep SLURM_ACCOUNT config/torch.env   # check it
 ```
+
+Until `SLURM_ACCOUNT` is set, `./install.sh` stops with
+`wf_env: set SLURM_ACCOUNT in config/torch.env (see my_slurm_accounts)`.
+
+Any folder name works for the clone, because the scripts find the repo from their own location. The paths
+below assume `~/wildfire`.
 
 Large data never goes in `$HOME`. Images, caches, assets and raw runs go to `/scratch/$USER/wildfire_work`.
 Nothing is pip- or conda-installed into `$HOME`: all Python packages live inside the container images.
