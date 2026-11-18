@@ -55,7 +55,7 @@ OnDemand and VS Code downloads, and troubleshooting.
 | Job | Request | Why |
 | --- | --- | --- |
 | `install.sh` | CPU only: 10 cores, 20 GB RAM, ≤ 4 h | builds and downloads need no GPU (same as the Go2 install job) |
-| `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, ≤ 1 h 20 min | G1 (containers) then G3 (scene with robots) run one after another in the same allocation, stopping at the first failure |
+| `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, time cap 25 min | G1 (containers) then G3 (scene with robots, 20 s of simulation recorded) in one allocation; the job ends as soon as G3 finishes, usually well under the cap |
 
 The job uses exactly one GPU (`--gres=gpu:1`). `run.sh` refuses to submit while another of your wildfire GPU
 jobs is queued or running, and a single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the

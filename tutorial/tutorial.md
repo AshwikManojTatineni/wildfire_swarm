@@ -77,6 +77,14 @@ tail -F /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out   # run.sh print
 To rerun a single gate, use `./run.sh g3_scene`. While one wildfire GPU job is queued or running, `run.sh`
 won't submit another. The sections below give each gate's pass rule.
 
+**How long it runs.** G3 simulates exactly 20 s (`video_seconds` in `config/mission.yaml`), writes the two
+videos and exits. The job ends right then and frees the GPU. `--time` is only a safety cap (10 min for G1,
+15 min for G3, 25 min total) so that a hung simulator never holds the GPU.
+
+The very first run is the slowest, because Isaac Sim compiles its shaders once and caches them in
+`/scratch/$USER/wildfire_work/cache`. If that first job hits the cap (`sacct` shows `TIMEOUT`), run
+`./run.sh` again: the cache is kept and later starts are much faster.
+
 ### G1: container startup
 
 Pass: `results/<job>_r0/g1/summary.json` shows:
