@@ -40,11 +40,14 @@ time_limit="$(printf '%02d:%02d:00' $((minutes / 60)) $((minutes % 60)))"
 mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
 echo "Submitting ONE job on ONE $(wf_cfg slurm.gpu_constraint): ${GATES[*]}  (${cpus} CPUs, ${mem}G RAM, ${time_limit})"
-sbatch --account="$SLURM_ACCOUNT" \
+jobid=$(sbatch --parsable --account="$SLURM_ACCOUNT" \
   --job-name="wf_run" \
   --gres="$(wf_cfg slurm.gpu_gres)" --constraint="$(wf_cfg slurm.gpu_constraint)" \
   --cpus-per-task="$cpus" --mem="${mem}G" --time="$time_limit" \
   --output="$WF_SCRATCH/slurm_logs/run_%j.out" \
   "${mail[@]}" \
   --export=ALL,WF_ALLOW_DIRTY="${WF_ALLOW_DIRTY:-0}" \
-  run.slurm "${GATES[@]}"
+  run.slurm "${GATES[@]}")
+jobid="${jobid%%;*}"
+echo "Submitted run job $jobid. Follow it (Ctrl+C stops watching, not the job):"
+echo "  tail -F $WF_SCRATCH/slurm_logs/run_${jobid}.out"

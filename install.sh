@@ -13,11 +13,14 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
 fi
 mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
-sbatch --account="$SLURM_ACCOUNT" \
+jobid=$(sbatch --parsable --account="$SLURM_ACCOUNT" \
   --job-name="wf_install" \
   --cpus-per-task="$(wf_cfg slurm.install.cpus)" \
   --mem="$(wf_cfg slurm.install.mem)" \
   --time="$(wf_cfg slurm.install.time)" \
   --output="$WF_SCRATCH/slurm_logs/install_%j.out" \
   "${mail[@]}" \
-  install.slurm "$@"
+  install.slurm "$@")
+jobid="${jobid%%;*}"
+echo "Submitted setup job $jobid. Follow it (Ctrl+C stops watching, not the job):"
+echo "  tail -F $WF_SCRATCH/slurm_logs/install_${jobid}.out"

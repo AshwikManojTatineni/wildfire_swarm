@@ -30,11 +30,24 @@ Nothing is pip- or conda-installed into `$HOME`: all Python packages live inside
 
 ## 1. Setup job (CPU only, about 1–1.5 h)
 
+Run these on the login node, in the same terminal:
+
 ```bash
 ./install.sh
-squeue --me
-tail -f /scratch/$USER/wildfire_work/slurm_logs/install_<jobid>.out
 ```
+
+It prints the job ID and the exact command to follow the job, for example:
+
+```
+Submitted setup job 4815162. Follow it (Ctrl+C stops watching, not the job):
+  tail -F /scratch/<netid>/wildfire_work/slurm_logs/install_4815162.out
+```
+
+Paste that `tail -F` line to watch the job live.
+
+- While the job is queued (`squeue --me` shows `PD`), the log file doesn't exist yet. `tail -F` waits for it.
+- Ctrl+C only stops the viewer; the job keeps running.
+- You can log out and check the same file later with `less`.
 
 The setup job does the following, all on a CPU compute node:
 
@@ -57,8 +70,8 @@ The summary is written to `results/install_<jobid>/summary.json`.
 
 ```bash
 ./run.sh                    # g1_startup -> g2_gpu -> g3_scene, same GPU, stops at first failure
-squeue --me
-tail -f /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out
+squeue --me                 # PD = queued, R = running
+tail -F /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out   # run.sh prints this exact line
 ```
 
 To rerun a single gate, use `./run.sh g3_scene`. While one wildfire GPU job is queued or running, `run.sh`
