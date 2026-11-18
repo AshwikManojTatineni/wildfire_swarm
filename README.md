@@ -23,7 +23,7 @@ wildfire_swarm/
 │   └── fastdds_udp.xml             # UDPv4-only Fast DDS profile shared by both
 ├── scripts/
 │   ├── cluster/                    # env, Apptainer wrappers, supervisor, manifest, asset preparation
-│   └── gates/                      # g1_startup, g2_gpu, g3_scene
+│   └── gates/                      # g1_startup, g3_scene
 ├── source/wildfire_swarm/          # python package (forest exporter, asset mirror; later sensors, fire, mission)
 ├── tests/                          # local unit tests
 └── tutorial/tutorial.md            # step-by-step cluster walkthrough
@@ -37,7 +37,7 @@ Clone into your home directory: code belongs in backed-up `$HOME`, and large dat
 cd $HOME && git clone <your-repo-url> wildfire && cd wildfire
 cp config/torch.env.example config/torch.env    # set SLURM_ACCOUNT (see my_slurm_accounts)
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
-./run.sh                                        # ONE job on ONE L40S: g1_startup -> g2_gpu -> g3_scene
+./run.sh                                        # ONE job on ONE L40S: g1_startup -> g3_scene
 ```
 
 Results land in `results/<jobid>_r0/`, and `results/latest` points to the newest one. To copy the videos to
@@ -55,7 +55,7 @@ OnDemand and VS Code downloads, and troubleshooting.
 | Job | Request | Why |
 | --- | --- | --- |
 | `install.sh` | CPU only: 10 cores, 20 GB RAM, ≤ 4 h | builds and downloads need no GPU (same as the Go2 install job) |
-| `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, ≤ 1 h 40 min | G1 → G2 → G3 run one after another in the same allocation, stopping at the first failure |
+| `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, ≤ 1 h 20 min | G1 (containers) then G3 (scene with robots) run one after another in the same allocation, stopping at the first failure |
 
 The job uses exactly one GPU (`--gres=gpu:1`). `run.sh` refuses to submit while another of your wildfire GPU
 jobs is queued or running, and a single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the

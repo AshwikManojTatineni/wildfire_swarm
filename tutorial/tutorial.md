@@ -3,7 +3,7 @@
 Like the Go2 project, there are two kinds of job:
 
 - **Setup** (`./install.sh`): one CPU-only job that builds the containers and prepares the assets.
-- **Run** (`./run.sh`): one job on **one** L40S GPU. It runs the gates one after another (G1 → G2 → G3) and
+- **Run** (`./run.sh`): one job on **one** L40S GPU. It runs the gates one after another (G1 → G3) and
   stops at the first failure.
 
 Every job writes its evidence to `~/wildfire/results/<jobid>_r0/` and exits non-zero if its check fails.
@@ -69,7 +69,7 @@ The summary is written to `results/install_<jobid>/summary.json`.
 ## 2. Run the gates (one job, one L40S)
 
 ```bash
-./run.sh                    # g1_startup -> g2_gpu -> g3_scene, same GPU, stops at first failure
+./run.sh                    # g1_startup -> g3_scene, same GPU, stops at first failure
 squeue --me                 # PD = queued, R = running
 tail -F /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out   # run.sh prints this exact line
 ```
@@ -86,10 +86,8 @@ Pass: `results/<job>_r0/g1/summary.json` shows:
 
 `g1/humble.txt` shows Python 3.10 and the Nav2, robot_localization and rtabmap_odom prefixes.
 
-### G2: GPU visibility
-
-Pass: `g2/summary.json` has `l40s: true`, `same_gpu_in_container: true` and `compat_passed: true`. The
-driver is recorded next to the version Isaac Sim 5.1 was tested on (580.65.06).
+There is no separate GPU-check gate. `manifest.json` records the allocated GPU and driver for every job,
+G3 can only render with a working GPU, and Torch itself warns about idle GPU allocations.
 
 ### G3: forest and robots, with video
 

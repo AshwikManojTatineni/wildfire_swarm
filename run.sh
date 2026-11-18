@@ -2,15 +2,15 @@
 # Login-node submitter (Go2 train.sh pattern, adapted to Torch: direct sbatch, --account
 # from config, no partition). ONE job, ONE L40S: the requested gates run one after another
 # inside that allocation and stop at the first failure (like Go2's train-then-play job).
-#   ./run.sh                          # g1_startup -> g2_gpu -> g3_scene
+#   ./run.sh                          # g1_startup -> g3_scene
 #   ./run.sh g3_scene                 # a single gate
-#   ./run.sh g1_startup g2_gpu        # any ordered subset
+#   ./run.sh g1_startup                # any ordered subset
 # A new GPU job is refused while one of yours is still queued or running.
 set -euo pipefail
 cd "$(dirname "$0")"
-GATES=("$@"); (( ${#GATES[@]} )) || GATES=(g1_startup g2_gpu g3_scene)
+GATES=("$@"); (( ${#GATES[@]} )) || GATES=(g1_startup g3_scene)
 for g in "${GATES[@]}"; do
-  [[ -f "scripts/gates/$g.sh" ]] || { echo "unknown gate: $g (gates: g1_startup g2_gpu g3_scene)" >&2; exit 2; }
+  [[ -f "scripts/gates/$g.sh" ]] || { echo "unknown gate: $g (gates: g1_startup g3_scene)" >&2; exit 2; }
 done
 source scripts/cluster/wf_env.sh
 if [[ -n "$(git status --porcelain --untracked-files=no)" && "${WF_ALLOW_DIRTY:-0}" != 1 ]]; then
@@ -28,7 +28,7 @@ fi
 # One allocation sized for the largest gate; wall time is the sum of the gates' limits.
 cpus=0; mem=0; minutes=0
 for g in "${GATES[@]}"; do
-  case "$g" in g1_*|g2_*) p=gpu_short ;; g[6-9]_*) p=gpu_large ;; *) p=gpu ;; esac
+  case "$g" in g1_*) p=gpu_short ;; g[6-9]_*) p=gpu_large ;; *) p=gpu ;; esac
   c="$(wf_cfg "slurm.$p.cpus")"; m="$(wf_cfg "slurm.$p.mem")"; t="$(wf_cfg "slurm.$p.time")"
   m="${m%G}"; IFS=: read -r hh mm _ <<< "$t"
   (( c > cpus )) && cpus=$c
