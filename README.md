@@ -37,9 +37,7 @@ Clone into your home directory: code belongs in backed-up `$HOME`, and large dat
 cd $HOME && git clone <your-repo-url> wildfire && cd wildfire
 cp config/torch.env.example config/torch.env    # set SLURM_ACCOUNT (see my_slurm_accounts)
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
-./run.sh g1_startup                             # L40S: containers start, Pegasus imports
-./run.sh g2_gpu                                 # L40S: GPU + driver visible, NVIDIA compatibility check
-./run.sh g3_scene                               # L40S: forest + robots, saves overview.mp4 and chase.mp4
+./run.sh                                        # ONE job on ONE L40S: g1_startup -> g2_gpu -> g3_scene
 ```
 
 Results land in `results/<jobid>_r0/`, and `results/latest` points to the newest one. To copy the videos to
@@ -57,8 +55,18 @@ OnDemand and VS Code downloads, and troubleshooting.
 | Job | Request | Why |
 | --- | --- | --- |
 | `install.sh` | CPU only: 10 cores, 20 GB RAM, ≤ 4 h | builds and downloads need no GPU (same as the Go2 install job) |
-| `g1_startup`, `g2_gpu` | 1× L40S, 10 cores, 20 GB RAM, ≤ 30 min | Go2 sizing; no scene is loaded |
-| `g3_scene` | 1× L40S, 10 cores, 32 GB RAM, ≤ 1 h | rendered forest scene; 32 GB is NVIDIA's minimum host RAM for Isaac Sim 5.1 |
+| `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, ≤ 1 h 40 min | G1 → G2 → G3 run one after another in the same allocation, stopping at the first failure |
+
+The job uses exactly one GPU (`--gres=gpu:1`). `run.sh` refuses to submit while another of your wildfire GPU
+jobs is queued or running, and a single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the
+start-up checks (Go2 sizing). The job requests 32 GB because the forest scene needs NVIDIA's minimum host RAM
+for Isaac Sim 5.1.
+
+To use that one GPU efficiently:
+- the unused default viewport is not rendered, only the two recording cameras;
+- video is encoded on a background CPU thread, so the simulation loop never waits;
+- the shader cache persists in scratch, so only the first run pays the shader compile;
+- the job releases the GPU as soon as a gate fails.
 
 `--mem` is host RAM. GPU memory is not requested: each job gets one whole L40S (48 GB VRAM). The L40S is the
 right Torch GPU because Isaac Sim needs RT cores, which A100, H100, H200 and B200 lack.

@@ -43,6 +43,17 @@ from isaacsim.core.utils.extensions import enable_extension  # noqa: E402
 enable_extension("omni.isaac.dynamic_control")  # Pegasus vehicles use it (deprecated in 5.x)
 app.update()
 
+# GPU efficiency: nothing watches the default viewport in a batch job, so stop rendering it.
+# Only the two recording cameras' render products are drawn.
+try:
+    from omni.kit.viewport.utility import get_active_viewport
+    _vp = get_active_viewport()
+    if _vp is not None:
+        _vp.updates_enabled = False
+        report["viewport_updates_disabled"] = True
+except Exception as exc:  # recorded, not fatal
+    report["viewport_updates_disabled"] = f"failed: {exc!r}"
+
 from isaacsim.core.api.world import World  # noqa: E402  (same class PegasusInterface uses)
 from isaacsim.core.prims import SingleArticulation  # noqa: E402
 from isaacsim.core.utils.types import ArticulationAction  # noqa: E402
@@ -172,8 +183,28 @@ import imageio.v2 as imageio  # noqa: E402  (baked into the SIF)
 
 fps, seconds = mission["render"]["video_fps"], mission["render"]["video_seconds"]
 every = max(1, round(render_hz / fps))
+import queue, threading  # noqa: E402
+
+# GPU efficiency: frames go to a background thread for H.264 encoding, so the simulation
+# and render loop never waits on ffmpeg. The queue is bounded to cap host memory.
+frame_q: "queue.Queue" = queue.Queue(maxsize=64)
 writers = {n: imageio.get_writer(str(OUT / f"{n}.mp4"), fps=fps, codec="libx264", quality=7,
                                  macro_block_size=8) for n in ("overview", "chase")}
+
+
+def _encode():
+    while True:
+        item = frame_q.get()
+        if item is None:
+            return
+        name, img, still = item
+        writers[name].append_data(img)
+        if still:
+            imageio.imwrite(str(OUT / f"still_{name}_{still:04d}.png"), img)
+
+
+encoder = threading.Thread(target=_encode, daemon=True)
+encoder.start()
 frames = {"overview": 0, "chase": 0}
 uav = pg.get_vehicle("/World/Robots/uav_1") if hasattr(pg, "get_vehicle") else None
 world.play()
@@ -196,13 +227,14 @@ for k in range(n_render):
         for name, cam in (("overview", cam_over), ("chase", cam_chase)):
             rgba = cam.get_rgba()
             if rgba is not None and rgba.size and rgba.ndim == 3:
-                writers[name].append_data(np.ascontiguousarray(rgba[:, :, :3]))
                 frames[name] += 1
-                if frames[name] in (1, int(seconds * fps // 2)):
-                    imageio.imwrite(str(OUT / f"still_{name}_{frames[name]:04d}.png"), rgba[:, :, :3])
+                still = frames[name] if frames[name] in (1, int(seconds * fps // 2)) else 0
+                frame_q.put((name, np.ascontiguousarray(rgba[:, :, :3]), still))
+wall = time.time() - t_wall
+frame_q.put(None)
+encoder.join()
 for w_ in writers.values():
     w_.close()
-wall = time.time() - t_wall
 
 p1, _ = carter.get_world_pose()
 dts = np.array(phys_dts)

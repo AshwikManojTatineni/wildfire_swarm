@@ -53,7 +53,7 @@ slurm:
   # --mem is host RAM (Go2 used 10 CPUs / 20 GB). GPU memory is not requested: the job gets the
   # whole L40S (48 GB VRAM). Values are raised only where a step needs it, and measured
   # usage (sacct MaxRSS, gpu_summary.json) is recorded to trim them further.
-  gpu_short: {cpus: 10, mem: 20G,  time: "00:30:00"}   # g1_startup, g2_gpu: Go2 sizing, no scene loaded
+  gpu_short: {cpus: 10, mem: 20G,  time: "00:20:00"}   # g1_startup, g2_gpu: Go2 sizing, no scene loaded
   gpu:       {cpus: 10, mem: 32G,  time: "01:00:00"}   # g3_scene: NVIDIA 5.1 minimum host RAM is 32 GB
   gpu_large: {cpus: 16, mem: 64G,  time: "04:00:00"}   # later four-AMR runs (re-sized from G3 measurements)
   install:   {cpus: 10, mem: 20G,  time: "04:00:00"}   # CPU only, Go2 install sizing

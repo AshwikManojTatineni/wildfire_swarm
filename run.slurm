@@ -1,6 +1,7 @@
 #!/bin/bash
-# Runtime job for one gate (Go2 train.slurm pattern on Torch):
-#   staged source snapshot -> manifest -> supervised gate -> per-job results.
+# Runtime job (Go2 train.slurm pattern on Torch): ONE allocation, ONE L40S.
+#   staged source snapshot -> manifest -> gates run one after another -> per-job results.
+# Stops at the first failing gate so the GPU is released as early as possible.
 # Account, GPU, CPU, memory and time come from run.sh.
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -9,8 +10,8 @@ set -euo pipefail
 
 cd "${SLURM_SUBMIT_DIR:?}"
 source scripts/cluster/wf_env.sh
-GATE="$1"; shift
-export WF_GATE="$GATE" WF_GATE_ARGS="$*"
+GATES=("$@")
+export WF_GATE="${GATES[*]}"
 
 # 1. Per-attempt run directory with an immutable snapshot of the committed source.
 mkdir -p "$WF_RUN_DIR"/{src,logs,tmp,home,config_snapshot} "$APPTAINER_TMPDIR"
@@ -18,11 +19,11 @@ git -C "$WF_REPO" archive HEAD | tar -x -C "$WF_RUN_DIR/src"
 git -C "$WF_REPO" diff HEAD > "$WF_RUN_DIR/uncommitted.diff" || true
 cp -r "$WF_REPO/config/." "$WF_RUN_DIR/config_snapshot/"
 rm -f "$WF_RUN_DIR/config_snapshot/torch.env"   # may hold an NGC key
-echo "== gate $GATE  job $SLURM_JOB_ID  restart ${SLURM_RESTART_COUNT:-0}  node $(hostname)  run $WF_RUN_DIR"
+echo "== gates ${GATES[*]}  job $SLURM_JOB_ID  restart ${SLURM_RESTART_COUNT:-0}  node $(hostname)  run $WF_RUN_DIR"
 
 # 2. Manifest: job, node, GPU/driver, SIF digests, git SHA, Pegasus commit, exact command.
 python3 "$WF_RUN_DIR/src/scripts/cluster/manifest.py" --out "$WF_RUN_DIR/manifest.json" \
-  --command "./run.sh $GATE $*" || echo "WARN: manifest incomplete"
+  --command "./run.sh ${GATES[*]}" || echo "WARN: manifest incomplete"
 
 # 3. GPU utilization / VRAM log every 5 s. Torch cancels low-utilization GPU jobs, and
 #    peak VRAM is checked against the 48 GB L40S budget in config/runtime.yaml.
@@ -30,10 +31,17 @@ nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total   --fo
 GPU_MON=$!
 trap 'kill $GPU_MON 2>/dev/null || true' EXIT
 
-# 4. Run the gate under the supervisor (it propagates failures, stops children on scancel).
+# 4. Run the gates in order on the same GPU (each uses the supervisor, which propagates
+#    failures and stops children on scancel). Stop at the first failure.
+rc=0; declare -A GATE_RC=()
 set +e
-bash "$WF_RUN_DIR/src/scripts/gates/$GATE.sh" "$@" 2>&1 | tee "$WF_RUN_DIR/logs/gate_driver.log"
-rc=${PIPESTATUS[0]}
+for g in "${GATES[@]}"; do
+  echo "== [$(date -u +%H:%M:%S)] gate $g start"
+  bash "$WF_RUN_DIR/src/scripts/gates/$g.sh" 2>&1 | tee "$WF_RUN_DIR/logs/gate_$g.log"
+  GATE_RC[$g]=${PIPESTATUS[0]}
+  echo "== [$(date -u +%H:%M:%S)] gate $g exit ${GATE_RC[$g]}"
+  if (( GATE_RC[$g] != 0 )); then rc=${GATE_RC[$g]}; break; fi
+done
 set -e
 kill "$GPU_MON" 2>/dev/null || true
 python3 - "$WF_RUN_DIR/gpu_usage.csv" "$(wf_cfg gpu_budget.warn_fraction)" > "$WF_RUN_DIR/gpu_summary.json" <<'PY' || true
@@ -59,8 +67,14 @@ cp "$WF_RUN_DIR"/manifest.json "$OUT/" 2>/dev/null || true
    -not -path './src/*' -not -path './config_snapshot/*' -not -path './tmp/*' \
    -exec cp --parents {} "$OUT" \;)
 for f in "$WF_RUN_DIR"/logs/*.log; do tail -n 200 "$f" > "$OUT/$(basename "$f").tail"; done
-echo "{\"gate\": \"$GATE\", \"job_id\": \"$SLURM_JOB_ID\", \"exit_code\": $rc, \"run_dir\": \"$WF_RUN_DIR\"}" > "$OUT/job_status.json"
-echo "== gate $GATE finished rc=$rc; results in $OUT"
+{
+  printf '{"job_id": "%s", "exit_code": %s, "run_dir": "%s", "gates": {' "$SLURM_JOB_ID" "$rc" "$WF_RUN_DIR"
+  sep=""; for g in "${GATES[@]}"; do printf '%s"%s": %s' "$sep" "$g" "${GATE_RC[$g]:-null}"; sep=", "; done
+  printf '}}
+'
+} > "$OUT/job_status.json"
+cat "$OUT/job_status.json"
+echo "== job finished rc=$rc; results in $OUT"
 for v in "$OUT"/*/*.mp4; do if [[ -f "$v" ]]; then echo "== video: $v ($(du -h "$v" | cut -f1))"; fi; done
 ln -sfn "$OUT" "$WF_REPO/results/latest"
 exit "$rc"

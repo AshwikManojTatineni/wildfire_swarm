@@ -1,31 +1,50 @@
 #!/usr/bin/env bash
-# Login-node submitter for one verification gate (Go2 train.sh pattern, adapted to
-# Torch: direct sbatch, --account from config, --gres=gpu:1 --constraint=l40s, no partition).
-# Every gate runs the simulator, so every gate gets one L40S (setup work is in install.sh).
-#   ./run.sh g1_startup | g2_gpu | g3_scene   [extra args passed to the gate]
+# Login-node submitter (Go2 train.sh pattern, adapted to Torch: direct sbatch, --account
+# from config, no partition). ONE job, ONE L40S: the requested gates run one after another
+# inside that allocation and stop at the first failure (like Go2's train-then-play job).
+#   ./run.sh                          # g1_startup -> g2_gpu -> g3_scene
+#   ./run.sh g3_scene                 # a single gate
+#   ./run.sh g1_startup g2_gpu        # any ordered subset
+# A new GPU job is refused while one of yours is still queued or running.
 set -euo pipefail
 cd "$(dirname "$0")"
-GATE="${1:?usage: ./run.sh <gate> [args]   (gates: g1_startup g2_gpu g3_scene)}"
-[[ -f "scripts/gates/$GATE.sh" ]] || { echo "unknown gate: $GATE" >&2; exit 2; }
+GATES=("$@"); (( ${#GATES[@]} )) || GATES=(g1_startup g2_gpu g3_scene)
+for g in "${GATES[@]}"; do
+  [[ -f "scripts/gates/$g.sh" ]] || { echo "unknown gate: $g (gates: g1_startup g2_gpu g3_scene)" >&2; exit 2; }
+done
 source scripts/cluster/wf_env.sh
 if [[ -n "$(git status --porcelain --untracked-files=no)" && "${WF_ALLOW_DIRTY:-0}" != 1 ]]; then
   echo "Working tree has uncommitted changes; the job snapshots HEAD. Commit, or set WF_ALLOW_DIRTY=1." >&2
   exit 2
 fi
-case "$GATE" in
-  g1_*|g2_*) size=gpu_short ;;
-  g[6-9]_*)  size=gpu_large ;;
-  *)         size=gpu ;;
-esac
+active="$(squeue --me --noheader --format='%i %j %T' 2>/dev/null | awk '$2 ~ /^wf_run/' || true)"
+if [[ -n "$active" ]]; then
+  echo "A wildfire GPU job is already queued/running (one GPU at a time):" >&2
+  echo "$active" >&2
+  echo "Wait for it, or cancel it with: scancel <jobid>" >&2
+  exit 3
+fi
+
+# One allocation sized for the largest gate; wall time is the sum of the gates' limits.
+cpus=0; mem=0; minutes=0
+for g in "${GATES[@]}"; do
+  case "$g" in g1_*|g2_*) p=gpu_short ;; g[6-9]_*) p=gpu_large ;; *) p=gpu ;; esac
+  c="$(wf_cfg "slurm.$p.cpus")"; m="$(wf_cfg "slurm.$p.mem")"; t="$(wf_cfg "slurm.$p.time")"
+  m="${m%G}"; IFS=: read -r hh mm _ <<< "$t"
+  (( c > cpus )) && cpus=$c
+  (( m > mem )) && mem=$m
+  minutes=$(( minutes + 10#$hh * 60 + 10#$mm ))
+done
+time_limit="$(printf '%02d:%02d:00' $((minutes / 60)) $((minutes % 60)))"
+
 mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
+echo "Submitting ONE job on ONE $(wf_cfg slurm.gpu_constraint): ${GATES[*]}  (${cpus} CPUs, ${mem}G RAM, ${time_limit})"
 sbatch --account="$SLURM_ACCOUNT" \
-  --job-name="wf_${GATE}" \
+  --job-name="wf_run" \
   --gres="$(wf_cfg slurm.gpu_gres)" --constraint="$(wf_cfg slurm.gpu_constraint)" \
-  --cpus-per-task="$(wf_cfg "slurm.$size.cpus")" \
-  --mem="$(wf_cfg "slurm.$size.mem")" \
-  --time="$(wf_cfg "slurm.$size.time")" \
-  --output="$WF_SCRATCH/slurm_logs/${GATE}_%j.out" \
+  --cpus-per-task="$cpus" --mem="${mem}G" --time="$time_limit" \
+  --output="$WF_SCRATCH/slurm_logs/run_%j.out" \
   "${mail[@]}" \
   --export=ALL,WF_ALLOW_DIRTY="${WF_ALLOW_DIRTY:-0}" \
-  run.slurm "$@"
+  run.slurm "${GATES[@]}"

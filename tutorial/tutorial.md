@@ -3,7 +3,8 @@
 Like the Go2 project, there are two kinds of job:
 
 - **Setup** (`./install.sh`): one CPU-only job that builds the containers and prepares the assets.
-- **Runs** (`./run.sh <gate>`): one job per step, each with one L40S GPU. Every run renders the simulator.
+- **Run** (`./run.sh`): one job on **one** L40S GPU. It runs the gates one after another (G1 → G2 → G3) and
+  stops at the first failure.
 
 Every job writes its evidence to `~/wildfire/results/<jobid>_r0/` and exits non-zero if its check fails.
 Run the steps in order.
@@ -52,11 +53,18 @@ The summary is written to `results/install_<jobid>/summary.json`.
 | The pull is denied | Put an NGC API key in `NGC_API_KEY` in `config/torch.env`. |
 | Scratch was purged, or `config/mission.yaml` changed | `./install.sh --assets-only` |
 
-## 2. G1: container startup (L40S, ≤ 30 min)
+## 2. Run the gates (one job, one L40S)
 
 ```bash
-./run.sh g1_startup
+./run.sh                    # g1_startup -> g2_gpu -> g3_scene, same GPU, stops at first failure
+squeue --me
+tail -f /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out
 ```
+
+To rerun a single gate, use `./run.sh g3_scene`. While one wildfire GPU job is queued or running, `run.sh`
+won't submit another. The sections below give each gate's pass rule.
+
+### G1: container startup
 
 Pass: `results/<job>_r0/g1/summary.json` shows:
 - `isaac_python` 3.11.x
@@ -65,20 +73,12 @@ Pass: `results/<job>_r0/g1/summary.json` shows:
 
 `g1/humble.txt` shows Python 3.10 and the Nav2, robot_localization and rtabmap_odom prefixes.
 
-## 3. G2: GPU visibility (L40S, ≤ 30 min)
-
-```bash
-./run.sh g2_gpu
-```
+### G2: GPU visibility
 
 Pass: `g2/summary.json` has `l40s: true`, `same_gpu_in_container: true` and `compat_passed: true`. The
 driver is recorded next to the version Isaac Sim 5.1 was tested on (580.65.06).
 
-## 4. G3: forest and robots, with video (L40S, ≤ 1 h)
-
-```bash
-./run.sh g3_scene
-```
+### G3: forest and robots, with video
 
 This step loads the forest, the Iris (parked on the takeoff patch) and one Nova Carter from local files
 only. It runs at 240 Hz physics and 60 Hz rendering, drives the Carter 4 m along the corridor and records
@@ -94,7 +94,7 @@ Pass, when every one of these is true in `g3/verdict.json`:
 | `carter_drove_ok` | the Carter moves ≥ 2 m forward, drifts ≤ 0.5 m sideways and doesn't fall |
 | `video_ok` | at least 90 % of the expected frames are in both videos |
 
-## 5. Getting the simulation video and results
+## 3. Getting the simulation video and results
 
 At the end of each run job, the Slurm log prints the video paths:
 
@@ -144,7 +144,7 @@ longer need.
 
 | What | Where |
 | --- | --- |
-| Slurm output | `/scratch/$USER/wildfire_work/slurm_logs/<gate>_<jobid>.out` |
+| Slurm output | `/scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out` (gates are marked `== gate ... start/exit`) |
 | Child process logs | `results/<job>_r0/*.log.tail`; full logs in `wildfire_work/runs/<job>_r0/logs/` |
 | Exact code that ran | `wildfire_work/runs/<job>_r0/src/` (snapshot of the committed `HEAD`) |
 | Job state and exit reason | `sacct -j <jobid> --format=JobID,State,ExitCode,Elapsed,MaxRSS,ReqTRES` |
