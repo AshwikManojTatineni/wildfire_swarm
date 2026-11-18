@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!-- UDPv4-only Fast DDS profile (NVIDIA Isaac Sim 5.1 ROS install page: required for
+     Docker / multi-container use). Used by BOTH isaac_pegasus.sif and humble_ws.sif.
+     Apptainer containall gives each container its own IPC namespace, so shared-memory
+     transport between them is never relied on. -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>UdpTransport</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="udp_transport_profile" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>UdpTransport</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

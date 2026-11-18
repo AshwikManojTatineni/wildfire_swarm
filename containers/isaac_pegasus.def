@@ -1,0 +1,48 @@
+Bootstrap: localimage
+From: {{ BASE_SIF }}
+
+# Isaac Sim 5.1.0 + Pegasus Simulator v5.1.0 (pinned commit), built by install.slurm:
+#   apptainer build --fakeroot --build-arg BASE_SIF=... --build-arg PEGASUS_COMMIT=... isaac_pegasus.sif isaac_pegasus.def
+# Pegasus' Kit-declared pip requirements (numpy, scipy, pymavlink, pyyaml, toml;
+# extension.toml uses use_online_index=true) are installed HERE so the GPU job
+# never reaches pip. numpy/scipy already in the
+# image are kept; pip only adds what is missing.
+
+%arguments
+    BASE_SIF=isaac-sim_5.1.0.sif
+    PEGASUS_COMMIT=644da37e9d5268e5f9a34e78bdcfd57a8bab82b4
+    PEGASUS_TAG=v5.1.0
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+    command -v git >/dev/null || (apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*)
+
+    git clone --branch {{ PEGASUS_TAG }} --depth 1 https://github.com/PegasusSimulator/PegasusSimulator.git /opt/PegasusSimulator
+    actual="$(git -C /opt/PegasusSimulator rev-parse HEAD)"
+    if [ "$actual" != "{{ PEGASUS_COMMIT }}" ]; then
+        echo "Pegasus tag {{ PEGASUS_TAG }} resolved to $actual, expected {{ PEGASUS_COMMIT }}" >&2
+        exit 1
+    fi
+
+    PY=/isaac-sim/python.sh
+    $PY -c "import numpy, scipy; print('numpy', numpy.__version__, 'scipy', scipy.__version__)"
+    # Pegasus as a library (its installation docs: pip install --editable pegasus.simulator).
+    $PY -m pip install --no-cache-dir --no-deps -e /opt/PegasusSimulator/extensions/pegasus.simulator
+    # Remaining Pegasus requirements + video encoding for gate evidence (Go2 saved mp4 too).
+    $PY -m pip install --no-cache-dir "pymavlink>=2.4,<2.5" "toml>=0.10,<0.11" "pyyaml>=6,<7" \
+        "imageio>=2.34,<3" "imageio-ffmpeg>=0.5,<0.7"
+    $PY -m pip freeze > /opt/isaac_pip_freeze.txt
+    echo "{{ PEGASUS_COMMIT }}" > /opt/pegasus_commit
+    chmod -R a+rX /opt/PegasusSimulator /opt/isaac_pip_freeze.txt /opt/pegasus_commit
+    # Rootless image: make the installed Python tree readable by any Torch uid.
+    chmod -R a+rX /isaac-sim/kit/python 2>/dev/null || true
+
+%labels
+    org.wildfire.base nvcr.io/nvidia/isaac-sim:5.1.0
+    org.wildfire.pegasus_tag {{ PEGASUS_TAG }}
+    org.wildfire.pegasus_commit {{ PEGASUS_COMMIT }}
+
+%test
+    /isaac-sim/python.sh -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version; print(sys.version)"
+    test "$(cat /opt/pegasus_commit)" = "{{ PEGASUS_COMMIT }}"

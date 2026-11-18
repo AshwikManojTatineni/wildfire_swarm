@@ -1,0 +1,58 @@
+# Single source of runtime pins and schedules.
+# install.slurm, run.slurm, scripts/ and source/wildfire_swarm read this file.
+
+image:
+  base: nvcr.io/nvidia/isaac-sim:5.1.0
+  base_digest: ""            # filled from install.slurm pull log (sif/digests.txt)
+  isaac_sif: isaac_pegasus.sif
+  humble_base: docker://osrf/ros:humble-desktop
+  humble_sif: humble_ws.sif
+
+pegasus:
+  repo: https://github.com/PegasusSimulator/PegasusSimulator
+  tag: v5.1.0
+  commit: 644da37e9d5268e5f9a34e78bdcfd57a8bab82b4
+  tested_driver: "550.163.01"   # from Pegasus v5.1.0 installation docs
+
+forest:
+  repo: https://github.com/joevento/Nvidia-Isaac-Sim-Procedual-Forest-Generator
+  generator_commit: 9e5fcbe3fd11974f7b72f1781d522ae6e2b8734d   # HEAD seen 2026-11-17; re-pin at export
+  stage: assets/stages/forest.usda
+
+rates:
+  physics_hz: 240            # physics_dt = 1/240 (overrides Pegasus default 1/250)
+  render_hz: 60              # rendering_dt = 1/60
+  uav_raw_imu_hz: 240        # Pegasus IMU update_rate (default 250)
+  imu_report_hz: 60          # four-sample average, stamped at window midpoint
+  wheel_odom_hz: 60
+  gps_hz: 5
+  heading_hz: 5
+  thermal_hz: 10             # Iris thermal + matched depth
+  ugv_thermal_hz: 5          # Carter forward thermal view
+  lidar_hz: 10
+  mission_hz: 2
+  lease_renew_hz: 1
+
+sensors:
+  uav_thermal_resolution: [640, 480]
+  ugv_thermal_resolution: [320, 240]   # reduced to fit four Carters on one GPU
+  thermal_depth_max_skew_s: 0.05
+
+dds:
+  rmw: rmw_fastrtps_cpp
+  profile: containers/fastdds_udp.xml  # UDPv4 only (no cross-container shared memory)
+  localhost_only: 1
+  domain_id_rule: "1 + SLURM_JOB_ID % 100"
+
+slurm:
+  gpu_gres: "gpu:1"
+  gpu_constraint: l40s
+  small:  {cpus: 16, mem: 96G,  time: "02:00:00"}   # gates G1-G5
+  large:  {cpus: 32, mem: 128G, time: "04:00:00"}   # gates G6-G9
+  install: {cpus: 16, mem: 64G, time: "04:00:00"}   # CPU-only build job
+
+nvidia_env:
+  ACCEPT_EULA: "Y"
+  PRIVACY_CONSENT: "N"
+
+seed: 20261117

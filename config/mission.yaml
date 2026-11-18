@@ -1,0 +1,43 @@
+# Mission scene parameters. Fire/suppression constants will be added with the fire model.
+# All values are recorded model choices.
+
+forest:
+  # Port of joevento's generator algorithm (Perlin terrain, age-scaled trees, rocks,
+  # clustered vegetation), made seeded and headless. See source/wildfire_swarm/wildfire_swarm/forest/build_forest.py.
+  seed: 20261117
+  size_m: [80.0, 60.0]          # x (corridor axis), y
+  grid_m: 0.5                   # terrain mesh resolution
+  elevation_diff_m: 2.0         # generator "Elevation difference (m)"
+  noise_scale_m: 25.0           # base wavelength of the fractal noise
+  edge_margin_m: 0.4            # generator's no-spawn edge zone for trees
+  tree_density_per_100m2: 8     # generator "Trees per 10x10m area"
+  tree_mix_percent: {Birch: 40, Spruce: 35, Pine: 25}
+  tree_age_range: [40, 90]      # generator age -> scale = age/100
+  trunk_radius_m: {Birch: 0.15, Spruce: 0.20, Pine: 0.20}   # collider radius at age 100
+  trunk_collider_height_m: 4.0                                # at age 100
+  rocks_per_100m2: 2
+  vegetation_per_100m2: 3       # half Blueberry clusters (10 plants), half Bush
+  models: {Birch: Birch_obj/Birch.usd, Spruce: Spruce_obj/Spruce.usd, Pine: Pine_obj/Pine.usd,
+           Rock: Rock_obj/Rock.usd, Bush: Bush_obj/Bush.usd, Blueberry: Blueberry_obj/Blueberry.usd}
+
+  # Surveyed drivable AMR corridor along +x at y = 0.
+  corridor: {x_min: -36.0, x_max: 36.0, half_width_m: 3.0, clearance_m: 1.0,
+             blend_m: 3.0, profile_smooth_m: 20.0, max_slope: 0.08}
+  # UAV takeoff patch with canopy clearance.
+  takeoff: {x: -30.0, y: -12.0, radius_m: 4.0, clearance_m: 2.0}
+  ugv_spawns_x: [-31.0, -27.0, -23.0, -19.0]   # ugv_1..ugv_4 on the corridor centreline
+
+robots:
+  # Non-ROS Nova Carter (the project owns TF and ROS graphs). Candidate paths under the 5.1 asset
+  # root, checked in order by g3_prep; the one found is recorded in asset_manifest.json.
+  nova_carter_candidates:
+    - /Isaac/Robots/NVIDIA/NovaCarter/nova_carter.usd
+    - /Isaac/Robots/NVIDIA/Carter/nova_carter/nova_carter.usd
+    - /Isaac/Robots/Carter/nova_carter.usd
+  carter_wheel_radius_m: 0.14       # verify against the asset at G3 (recorded, not assumed later)
+  g3_drive: {speed_mps: 0.5, seconds: 8.0, min_distance_m: 2.0, max_lateral_m: 0.5}
+
+render:
+  video_resolution: [1280, 720]
+  video_seconds: 20.0
+  video_fps: 30

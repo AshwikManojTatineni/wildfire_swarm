@@ -1,0 +1,27 @@
+Bootstrap: docker
+From: osrf/ros:humble-desktop
+
+# External ROS 2 Humble environment (Ubuntu 22.04, native Python 3.10) for Nav2,
+# robot_localization, RTAB-Map ICP odometry and mission nodes.
+# Never sourced into the Isaac Sim process; talks to it over Fast DDS UDP.
+
+%post
+    set -eu
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        ros-humble-navigation2 ros-humble-nav2-bringup \
+        ros-humble-robot-localization ros-humble-rtabmap-odom \
+        ros-humble-rmw-fastrtps-cpp ros-humble-tf2-tools \
+        python3-colcon-common-extensions build-essential
+    rm -rf /var/lib/apt/lists/*
+    dpkg-query -W -f='${Package} ${Version}\n' 'ros-humble-*' > /opt/versions.txt
+    python3 --version >> /opt/versions.txt
+
+%labels
+    org.wildfire.role external-humble
+
+%test
+    python3 -c "import sys; assert sys.version_info[:2] == (3, 10), sys.version"
+    test -f /opt/ros/humble/share/nav2_bringup/package.xml
+    test -f /opt/ros/humble/share/robot_localization/package.xml
