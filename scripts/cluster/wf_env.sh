@@ -4,6 +4,12 @@
 # Requires config/torch.env (copied from config/torch.env.example).
 
 _wf_here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+# Jobs snapshot the committed code with `git archive HEAD`, so a copied folder (scp, zip) cannot run.
+if ! git -C "$_wf_here" rev-parse --git-dir >/dev/null 2>&1; then
+  echo "wf_env: $_wf_here is not a git clone (no .git). Clone it instead of copying it:" >&2
+  echo "  git clone <your-repo-url> <folder>" >&2
+  return 2 2>/dev/null || exit 2
+fi
 if [[ -f "$_wf_here/config/torch.env" ]]; then
   # shellcheck disable=SC1091
   source "$_wf_here/config/torch.env"
