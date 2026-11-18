@@ -166,13 +166,19 @@ def _copy_models(models_src: Path, out: Path, params) -> dict:
     for name, rel in params["models"].items():
         src_dir = models_src / Path(rel).parent
         dst_dir = out / "models" / Path(rel).parent
-        if not dst_dir.exists():
-            shutil.copytree(src_dir, dst_dir, ignore=shutil.ignore_patterns("*.blend", ".thumbs"))
-            for usd in dst_dir.glob("*.usd*"):
+        if not (dst_dir / Path(rel).name).is_file():
+            # Copy into a temp dir and rename, so a job killed mid-copy never leaves a
+            # half-copied model folder that a later run would mistake for a finished one.
+            tmp = dst_dir.with_name(dst_dir.name + ".tmp")
+            shutil.rmtree(tmp, ignore_errors=True)
+            shutil.rmtree(dst_dir, ignore_errors=True)
+            shutil.copytree(src_dir, tmp, ignore=shutil.ignore_patterns("*.blend", ".thumbs"))
+            for usd in tmp.glob("*.usd*"):
                 layer = Sdf.Layer.FindOrOpen(str(usd))
                 layer.pseudoRoot.SetInfo("metersPerUnit", 1.0)
                 layer.pseudoRoot.SetInfo("upAxis", "Z")
                 layer.Save()
+            tmp.rename(dst_dir)
         refs[name] = "./models/" + Path(rel).as_posix()
     return refs
 

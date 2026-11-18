@@ -1,9 +1,8 @@
 config/torch.env
 *.sif
 runs/
+results/
 __pycache__/
 *.egg-info/
 .venv/
 .pytest_cache/
-results/**/*.mp4
-results/**/*.png

@@ -182,3 +182,12 @@ def test_terrain_height_bilinear_inside_grid():
     assert terrain_height(hf, 0.5, 0.5) == pytest.approx(1.5)
     assert terrain_height(hf, 1.0, 0.0) == pytest.approx(2.0)   # rows = x, cols = y
     assert terrain_height(hf, 5.0, 5.0) == pytest.approx(3.0)   # clamped to edge
+
+
+def test_interrupted_model_copy_is_redone(models, tmp_path):
+    out = tmp_path / "f"
+    partial = out / "models" / "Birch_obj"
+    partial.mkdir(parents=True)            # a copy that was killed before any file landed
+    rep = build_forest(models, out, PARAMS, seed=3)
+    assert (partial / "Birch.usd").is_file()
+    assert set(rep["unresolved"]) <= ALLOWED_UNRESOLVED

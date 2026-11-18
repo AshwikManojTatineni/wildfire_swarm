@@ -74,8 +74,8 @@ squeue --me                 # PD = queued, R = running
 tail -F /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out   # run.sh prints this exact line
 ```
 
-To rerun a single gate, use `./run.sh g3_scene`. While one wildfire GPU job is queued or running, `run.sh`
-won't submit another. The sections below give each gate's pass rule.
+To rerun a single gate, use `./run.sh g3_scene`. While one of your wildfire jobs (setup or run) is queued or
+running, `install.sh` and `run.sh` won't submit another. The sections below give each gate's pass rule.
 
 **How long it runs.** G3 simulates exactly 20 s (`video_seconds` in `config/mission.yaml`), writes the two
 videos and exits. The job ends right then and frees the GPU. `--time` is only a safety cap (10 min for G1,
@@ -155,7 +155,7 @@ also play it directly.
 **Option C: VS Code Remote-SSH.** Open `~/wildfire/results/latest/g3/` in the Explorer, then right-click
 `overview.mp4` and choose **Download…**.
 
-Videos are git-ignored, so they never end up in the repository. Each run's video pair is about 20–40 MB in
+`results/` is git-ignored, so videos and run files never end up in the repository. Each run's video pair is about 20–40 MB in
 `$HOME` (50 GB quota). Check your usage with `myquota`, and delete old `results/<jobid>_r0/` folders you no
 longer need.
 

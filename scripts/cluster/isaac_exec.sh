@@ -23,7 +23,6 @@ for d in main computecache logs config data pkg kit/cache kit/data; do mkdir -p 
 mkdir -p "$WF_RUN_DIR"/{tmp,src} "$WF_ASSETS" "$WF_SRC_CACHE"
 
 assets_mode=ro; [[ "${WF_ASSETS_RW:-0}" == 1 ]] && assets_mode=rw
-gpu_flag=(--nv); [[ "${WF_NO_GPU:-0}" == 1 ]] && gpu_flag=()
 
 env_args=(
   --env "ACCEPT_EULA=$(wf_cfg nvidia_env.ACCEPT_EULA)"
@@ -35,10 +34,8 @@ env_args=(
   --env "ROS_LOCALHOST_ONLY=$ROS_LOCALHOST_ONLY"
   --env "FASTRTPS_DEFAULT_PROFILES_FILE=/workspace/src/containers/fastdds_udp.xml"
   --env "LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.bridge/humble/lib"
-  --env "WF_ASSET_ROOT=/workspace/assets"
   --env "PYTHONPATH=/workspace/src/source/wildfire_swarm"
   --env "PYTHONNOUSERSITE=1"
-  --env "WF_RUN=/workspace/run"
   --env "SLURM_JOB_ID=${SLURM_JOB_ID:-local}"
 )
 # Optional offline enforcement: a black-hole proxy makes accidental http(s) fetches fail fast.
@@ -48,7 +45,7 @@ if [[ "${WF_OFFLINE:-0}" == 1 ]]; then
              --env "WF_OFFLINE=1")
 fi
 
-exec apptainer exec "${gpu_flag[@]}" --containall --cleanenv --no-home --writable-tmpfs \
+exec apptainer exec --nv --containall --cleanenv --no-home --writable-tmpfs \
   "${env_args[@]}" \
   -B "$WF_CACHE/main:/isaac-sim/.cache:rw" \
   -B "$WF_CACHE/computecache:/isaac-sim/.nv/ComputeCache:rw" \

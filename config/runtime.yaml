@@ -3,21 +3,17 @@
 
 image:
   base: nvcr.io/nvidia/isaac-sim:5.1.0
-  base_digest: ""            # filled from install.slurm pull log (sif/digests.txt)
   isaac_sif: isaac_pegasus.sif
-  humble_base: docker://osrf/ros:humble-desktop
   humble_sif: humble_ws.sif
 
 pegasus:
-  repo: https://github.com/PegasusSimulator/PegasusSimulator
   tag: v5.1.0
   commit: 644da37e9d5268e5f9a34e78bdcfd57a8bab82b4
   tested_driver: "550.163.01"   # from Pegasus v5.1.0 installation docs
 
 forest:
   repo: https://github.com/joevento/Nvidia-Isaac-Sim-Procedual-Forest-Generator
-  generator_commit: 9e5fcbe3fd11974f7b72f1781d522ae6e2b8734d   # HEAD seen 2026-11-17; re-pin at export
-  stage: assets/stages/forest.usda
+  generator_commit: 9e5fcbe3fd11974f7b72f1781d522ae6e2b8734d   # HEAD seen 2026-11-17
 
 rates:
   physics_hz: 240            # physics_dt = 1/240 (overrides Pegasus default 1/250)
@@ -40,9 +36,7 @@ sensors:
 
 dds:
   rmw: rmw_fastrtps_cpp
-  profile: containers/fastdds_udp.xml  # UDPv4 only (no cross-container shared memory)
-  localhost_only: 1
-  domain_id_rule: "1 + SLURM_JOB_ID % 100"
+  localhost_only: 1   # profile: containers/fastdds_udp.xml (UDPv4 only); domain id: scripts/cluster/wf_env.sh
 
 slurm:
   # Torch: --account required, no --partition, GPU via --gres + --constraint.
@@ -60,11 +54,9 @@ slurm:
 
 gpu_budget:
   # Isaac Sim 5.1 requirements: >= 16 GB VRAM (ideal 48 GB), 32-64 GB RAM, Linux driver 580.65.06 tested.
-  vram_gb_available: 48
-  vram_gb_estimate_g3: 10       # Kit/RTX ~4 + forest textures <= 3.8 + instanced geometry ~0.3 + Carter ~0.6 + 2 cameras ~1
-  vram_gb_estimate_full: 16     # + 3 Carters, 4 RTX LiDARs, 5 thermal/depth render products
+  # Estimated VRAM: G3 ~10 GB (Kit/RTX ~4, forest textures <= 3.8, instanced geometry ~0.3,
+  # Carter ~0.6, 2 cameras ~1); full mission ~16 GB. The L40S has 48 GB.
   warn_fraction: 0.8            # run.slurm flags a job whose peak VRAM exceeds 80 % of the GPU
-  tested_driver: "580.65.06"
 
 assets:
   isaac_root_url: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1
@@ -73,4 +65,3 @@ nvidia_env:
   ACCEPT_EULA: "Y"
   PRIVACY_CONSENT: "N"
 
-seed: 20261117

@@ -5,7 +5,7 @@
 #   ./run.sh                          # g1_startup -> g3_scene
 #   ./run.sh g3_scene                 # a single gate
 #   ./run.sh g1_startup                # any ordered subset
-# A new GPU job is refused while one of yours is still queued or running.
+# Refused while one of your wildfire jobs (setup or run) is still queued or running.
 set -euo pipefail
 cd "$(dirname "$0")"
 GATES=("$@"); (( ${#GATES[@]} )) || GATES=(g1_startup g3_scene)
@@ -17,9 +17,9 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" && "${WF_ALLOW_DIRTY:-
   echo "Working tree has uncommitted changes; the job snapshots HEAD. Commit, or set WF_ALLOW_DIRTY=1." >&2
   exit 2
 fi
-active="$(squeue --me --noheader --format='%i %j %T' 2>/dev/null | awk '$2 ~ /^wf_run/' || true)"
+active="$(wf_active_jobs)"
 if [[ -n "$active" ]]; then
-  echo "A wildfire GPU job is already queued/running (one GPU at a time):" >&2
+  echo "A wildfire job is already queued/running (one at a time):" >&2
   echo "$active" >&2
   echo "Wait for it, or cancel it with: scancel <jobid>" >&2
   exit 3

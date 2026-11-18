@@ -14,11 +14,9 @@ GATES=("$@")
 export WF_GATE="${GATES[*]}"
 
 # 1. Per-attempt run directory with an immutable snapshot of the committed source.
-mkdir -p "$WF_RUN_DIR"/{src,logs,tmp,home,config_snapshot} "$APPTAINER_TMPDIR"
-git -C "$WF_REPO" archive HEAD | tar -x -C "$WF_RUN_DIR/src"
+mkdir -p "$WF_RUN_DIR"/{src,logs,tmp,home} "$APPTAINER_TMPDIR"
+git -C "$WF_REPO" archive HEAD | tar -x -C "$WF_RUN_DIR/src"     # includes config/ as committed
 git -C "$WF_REPO" diff HEAD > "$WF_RUN_DIR/uncommitted.diff" || true
-cp -r "$WF_REPO/config/." "$WF_RUN_DIR/config_snapshot/"
-rm -f "$WF_RUN_DIR/config_snapshot/torch.env"   # may hold an NGC key
 echo "== gates ${GATES[*]}  job $SLURM_JOB_ID  restart ${SLURM_RESTART_COUNT:-0}  node $(hostname)  run $WF_RUN_DIR"
 
 # 2. Manifest: job, node, GPU/driver, SIF digests, git SHA, Pegasus commit, exact command.
@@ -27,9 +25,13 @@ python3 "$WF_RUN_DIR/src/scripts/cluster/manifest.py" --out "$WF_RUN_DIR/manifes
 
 # 3. GPU utilization / VRAM log every 5 s. Torch cancels low-utilization GPU jobs, and
 #    peak VRAM is checked against the 48 GB L40S budget in config/runtime.yaml.
-nvidia-smi --query-gpu=timestamp,utilization.gpu,memory.used,memory.total   --format=csv,noheader,nounits -l 5 > "$WF_RUN_DIR/gpu_usage.csv" 2>/dev/null &
+#    Only the allocated GPU is logged: if the node does not hide the other three, an unfiltered
+#    query would average in other users' GPUs.
+gpu_sel=(); [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]] && gpu_sel=(-i "${CUDA_VISIBLE_DEVICES%%,*}")
+nvidia-smi "${gpu_sel[@]}" --query-gpu=timestamp,utilization.gpu,memory.used,memory.total \
+  --format=csv,noheader,nounits -l 5 > "$WF_RUN_DIR/gpu_usage.csv" 2>/dev/null &
 GPU_MON=$!
-trap 'kill $GPU_MON 2>/dev/null || true' EXIT
+trap 'kill $GPU_MON 2>/dev/null || true; rm -rf "$APPTAINER_TMPDIR"' EXIT
 
 # 4. Run the gates in order on the same GPU (each uses the supervisor, which propagates
 #    failures and stops children on scancel). Stop at the first failure.
@@ -64,7 +66,7 @@ mkdir -p "$OUT"
 cp "$WF_RUN_DIR"/manifest.json "$OUT/" 2>/dev/null || true
 (cd "$WF_RUN_DIR" && find . -maxdepth 2 \
    \( -name '*.json' -o -name '*.mp4' -o -name '*.png' -o -name '*.txt' -o -name '*.csv' \) \
-   -not -path './src/*' -not -path './config_snapshot/*' -not -path './tmp/*' \
+   -not -path './src/*' -not -path './tmp/*' \
    -exec cp --parents {} "$OUT" \;)
 for f in "$WF_RUN_DIR"/logs/*.log; do tail -n 200 "$f" > "$OUT/$(basename "$f").tail"; done
 {

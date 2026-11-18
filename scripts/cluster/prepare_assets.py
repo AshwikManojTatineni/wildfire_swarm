@@ -23,6 +23,7 @@ OUT.mkdir(parents=True, exist_ok=True)
 mission = yaml.safe_load(open("/workspace/src/config/mission.yaml"))
 runtime = yaml.safe_load(open("/workspace/src/config/runtime.yaml"))
 summary = {"errors": [], "warnings": []}
+CORE_MDL = {"OmniPBR.mdl", "OmniPBR_Opacity.mdl", "OmniGlass.mdl"}  # shipped inside Isaac Sim, found via its MDL path
 
 
 def sha256(path):
@@ -46,6 +47,9 @@ try:
     summary["forest"]["generator_commit"] = runtime["forest"]["generator_commit"]
     if rep["remote_refs"]:
         summary["errors"].append(f"forest has remote refs: {rep['remote_refs'][:5]}")
+    missing = sorted(set(rep["unresolved"]) - CORE_MDL)
+    if missing:
+        summary["errors"].append(f"forest references files that are not there: {missing[:10]}")
 except Exception as exc:
     traceback.print_exc()
     summary["errors"].append(f"forest: {exc!r}")

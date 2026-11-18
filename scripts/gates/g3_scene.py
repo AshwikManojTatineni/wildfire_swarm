@@ -32,6 +32,19 @@ def fail(msg):
     print("G3 ERROR:", msg, flush=True)
 
 
+def _crash_verdict(exc_type, exc, tb):
+    """Any uncaught error still leaves a verdict and the partial report for debugging."""
+    report["errors"].append("".join(traceback.format_exception(exc_type, exc, tb)))
+    (OUT / "stage_report.json").write_text(json.dumps(report, indent=2, default=str))
+    (OUT / "verdict.json").write_text(json.dumps({"gate": "G3", "pass": False, "crashed": True,
+                                                  "error": repr(exc), "measured": report["checks"]}, indent=2,
+                                                 default=str))
+    sys.__excepthook__(exc_type, exc, tb)
+
+
+sys.excepthook = _crash_verdict
+
+
 # Offline asset root BEFORE anything imports pegasus.simulator.params (it resolves the root at import).
 settings = carb.settings.get_settings()
 for key in ("/persistent/isaac/asset_root/default", "/persistent/isaac/asset_root/cloud",
@@ -62,14 +75,14 @@ from omni.physx import get_physx_scene_query_interface  # noqa: E402
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics  # noqa: E402
 from scipy.spatial.transform import Rotation  # noqa: E402
 
-from pegasus.simulator.params import ROBOTS  # noqa: E402
+from pegasus.simulator.params import NVIDIA_ASSETS_PATH, ROBOTS  # noqa: E402
 from pegasus.simulator.logic.interface.pegasus_interface import PegasusInterface  # noqa: E402
 from pegasus.simulator.logic.vehicles.multirotor import Multirotor, MultirotorConfig  # noqa: E402
 
 asset_manifest = json.loads((ASSETS / "asset_manifest.json").read_text())
 carter_rel = asset_manifest["summary"]["nova_carter_rel"]
 anchors = json.loads((ASSETS / "forest" / "anchors.json").read_text())
-report["pegasus_assets_root"] = __import__("pegasus.simulator.params", fromlist=["NVIDIA_ASSETS_PATH"]).NVIDIA_ASSETS_PATH
+report["pegasus_assets_root"] = NVIDIA_ASSETS_PATH
 
 # --- World with the project rates (Pegasus default is 1/250) ----------------------------------
 physics_hz, render_hz = runtime["rates"]["physics_hz"], runtime["rates"]["render_hz"]
@@ -157,7 +170,8 @@ report["checks"]["terrain_raycasts"] = terrain_hits
 report["checks"]["terrain_collider_ok"] = all(h.endswith("/Terrain") for h in terrain_hits)
 tree0 = stage.GetPrimAtPath("/World/Environment/Trees/Tree_0000")
 tpos = UsdGeom.Xformable(tree0).ComputeLocalToWorldTransform(Usd.TimeCode.Default()).ExtractTranslation()
-hit = sq.raycast_closest(carb.Float3(tpos[0] - 3.0, tpos[1], tpos[2] + 1.0), carb.Float3(1, 0, 0), 6.0)
+# Start 1 m from the trunk axis (radius <= 0.2 m), 1 m above its base: nothing else fits in between.
+hit = sq.raycast_closest(carb.Float3(tpos[0] - 1.0, tpos[1], tpos[2] + 1.0), carb.Float3(1, 0, 0), 2.0)
 report["checks"]["trunk_raycast"] = hit.get("collision", "") if hit.get("hit") else ""
 report["checks"]["trunk_collider_ok"] = report["checks"]["trunk_raycast"].endswith("TrunkCollider")
 
@@ -192,15 +206,25 @@ writers = {n: imageio.get_writer(str(OUT / f"{n}.mp4"), fps=fps, codec="libx264"
                                  macro_block_size=8) for n in ("overview", "chase")}
 
 
+encode_errors: list = []
+
+
 def _encode():
+    # Keeps draining the queue even after an encoder error, so the render loop can never
+    # block on a full queue (a dead consumer would otherwise hang the job until its time cap).
     while True:
         item = frame_q.get()
         if item is None:
             return
+        if encode_errors:
+            continue
         name, img, still = item
-        writers[name].append_data(img)
-        if still:
-            imageio.imwrite(str(OUT / f"still_{name}_{still:04d}.png"), img)
+        try:
+            writers[name].append_data(img)
+            if still:
+                imageio.imwrite(str(OUT / f"still_{name}_{still:04d}.png"), img)
+        except Exception as exc:  # recorded; video_ok then fails
+            encode_errors.append(repr(exc))
 
 
 encoder = threading.Thread(target=_encode, daemon=True)
@@ -234,7 +258,12 @@ wall = time.time() - t_wall
 frame_q.put(None)
 encoder.join()
 for w_ in writers.values():
-    w_.close()
+    try:
+        w_.close()
+    except Exception as exc:
+        encode_errors.append(repr(exc))
+for e in encode_errors:
+    fail(f"video encoding: {e}")
 
 p1, _ = carter.get_world_pose()
 dts = np.array(phys_dts)
@@ -258,7 +287,7 @@ c["rates_ok"] = (dts.size > 0 and abs(dts.mean() - 1.0 / physics_hz) < 1e-6
 c["carter_drove_ok"] = (report["carter"]["dx"] >= drive["min_distance_m"]
                         and abs(report["carter"]["dy"]) <= drive["max_lateral_m"]
                         and abs(report["carter"]["dz"]) < 0.5)
-c["video_ok"] = all(n >= int(0.9 * seconds * fps) for n in frames.values())
+c["video_ok"] = not encode_errors and all(n >= int(0.9 * seconds * fps) for n in frames.values())
 passed = not report["errors"] and all(c[k] for k in ("offline_ok", "terrain_collider_ok", "trunk_collider_ok",
                                                       "rates_ok", "carter_drove_ok", "video_ok"))
 verdict = {"gate": "G3", "pass": bool(passed),

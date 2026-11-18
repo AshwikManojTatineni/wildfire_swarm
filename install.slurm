@@ -16,6 +16,7 @@ done
 mkdir -p "$WF_SIF_DIR" "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR" "$WF_SRC_CACHE" "$WF_ASSETS"
 LOG="$WF_SIF_DIR/install_${SLURM_JOB_ID}.log"
 exec > >(tee -a "$LOG") 2>&1
+trap 'rm -rf "$APPTAINER_TMPDIR"' EXIT
 
 echo "== wildfire install job $SLURM_JOB_ID on $(hostname) at $(date -u +%FT%TZ)"
 apptainer --version
@@ -70,6 +71,10 @@ if [[ ! -f "$WF_HUMBLE_SIF" || $FORCE == 1 ]]; then
   mv "$WF_HUMBLE_SIF.tmp" "$WF_HUMBLE_SIF"
 fi
 
+# Image checksums for the run manifests (only when images may have changed: ~40 GB to hash).
+( cd "$WF_SIF_DIR" && sha256sum ./*.sif ) > "$WF_SIF_DIR/sif_sha256.txt"
+apptainer exec "$WF_ISAAC_SIF" cat /opt/pegasus_commit /opt/isaac_pip_freeze.txt > "$WF_SIF_DIR/isaac_versions.txt"
+apptainer exec "$WF_HUMBLE_SIF" cat /opt/versions.txt > "$WF_SIF_DIR/humble_versions.txt"
 fi  # ASSETS_ONLY
 
 # 5. Forest generator source at the pinned commit (its models are exported in step 6).
@@ -92,11 +97,8 @@ cp "$WF_ASSETS/asset_manifest.json" "$WF_RUN_DIR/assets/asset_manifest.json"
 # 7. Local checks on the compute node (nothing is pip-installed into $HOME).
 bash scripts/cluster/ros_exec.sh 'cd /workspace/src && PXR_USDC_EMIT_DEPRECATION_WARNINGS=0 python3 -m pytest -q -p no:cacheprovider'   | tee "$WF_RUN_DIR/assets/pytest.txt"
 
-# 8. Digests + versions for the run manifests.
-( cd "$WF_SIF_DIR" && sha256sum ./*.sif ) > "$WF_SIF_DIR/digests.txt"
-apptainer exec "$WF_ISAAC_SIF" cat /opt/pegasus_commit /opt/isaac_pip_freeze.txt > "$WF_SIF_DIR/isaac_versions.txt"
-apptainer exec "$WF_HUMBLE_SIF" cat /opt/versions.txt > "$WF_SIF_DIR/humble_versions.txt"
-echo "forest_generator $FOREST_COMMIT" >> "$WF_SIF_DIR/digests.txt"
+# 8. Digests for the run manifests: image checksums + forest generator commit.
+{ cat "$WF_SIF_DIR/sif_sha256.txt" 2>/dev/null || true; echo "forest_generator $FOREST_COMMIT"; } > "$WF_SIF_DIR/digests.txt"
 cat "$WF_SIF_DIR/digests.txt"
 
 OUT="$WF_REPO/results/install_${SLURM_JOB_ID}"

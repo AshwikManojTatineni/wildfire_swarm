@@ -27,7 +27,8 @@ def main():
     args = ap.parse_args()
     env = os.environ
     sif_dir, repo = env.get("WF_SIF_DIR", ""), env.get("WF_REPO", "")
-    gpu = sh("nvidia-smi", "--query-gpu=name,uuid,driver_version,memory.total", "--format=csv,noheader")
+    sel = ["-i", env["CUDA_VISIBLE_DEVICES"].split(",")[0]] if env.get("CUDA_VISIBLE_DEVICES") else []
+    gpu = sh("nvidia-smi", *sel, "--query-gpu=name,uuid,driver_version,memory.total", "--format=csv,noheader")
     digests = {}
     for line in read(f"{sif_dir}/digests.txt").splitlines():
         parts = line.split()

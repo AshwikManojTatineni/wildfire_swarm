@@ -11,6 +11,7 @@ Bare names that do not exist next to the referencing layer (for example
 from __future__ import annotations
 
 import posixpath
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -18,18 +19,28 @@ from pathlib import Path
 from pxr import Sdf, UsdUtils
 
 USD_EXT = (".usd", ".usda", ".usdc")
+RETRIES = 4            # ~800 sequential HTTPS GETs: one network blip must not fail the setup job
+RETRY_SLEEP_S = 2.0    # doubled after each failed attempt
 
 
 def _fetch(url: str, dst: Path, timeout: float) -> bool:
+    """Download url to dst (atomic). False on 403/404 (S3 answers 403 for missing keys)."""
     if dst.is_file():
         return True
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            data = resp.read()
-    except urllib.error.HTTPError as exc:
-        if exc.code in (403, 404):
-            return False
-        raise
+    for attempt in range(RETRIES):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as resp:
+                data = resp.read()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404):
+                return False
+            if attempt == RETRIES - 1 or exc.code < 500:
+                raise
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if attempt == RETRIES - 1:
+                raise
+        time.sleep(RETRY_SLEEP_S * 2 ** attempt)
     dst.parent.mkdir(parents=True, exist_ok=True)
     tmp = dst.with_name(dst.name + ".part")
     tmp.write_bytes(data)
@@ -49,12 +60,18 @@ def mirror_usd(root_url: str, rel: str, dest, timeout: float = 120.0) -> dict:
     rep = {"root": root, "asset": "/" + start, "files": [], "downloaded": 0, "rewritten": 0,
            "search_path_assets": [], "outside_root": [], "missing": [], "udim": []}
 
+    not_found: set = set()   # each missing URL is asked for once (core MDL names repeat in every layer)
+
     def get(r: str) -> bool:
+        if r in not_found:
+            return False
         local = dest / r
         existed = local.is_file()
         ok = _fetch(f"{root}/{r}", local, timeout)
         if ok and not existed:
             rep["downloaded"] += 1
+        if not ok:
+            not_found.add(r)
         return ok
 
     if not get(start):

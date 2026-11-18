@@ -11,6 +11,13 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "Commit your changes first: the setup job snapshots the committed HEAD." >&2
   exit 2
 fi
+active="$(wf_active_jobs)"
+if [[ -n "$active" ]]; then
+  echo "A wildfire job is already queued/running; setup would rewrite the assets it reads:" >&2
+  echo "$active" >&2
+  echo "Wait for it, or cancel it with: scancel <jobid>" >&2
+  exit 3
+fi
 mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
 jobid=$(sbatch --parsable --account="$SLURM_ACCOUNT" \

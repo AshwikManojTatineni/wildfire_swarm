@@ -37,8 +37,12 @@ def server(tmp_path_factory):
         sh2.GetPrim().CreateAttribute("info:mdl:sourceAsset", Sdf.ValueTypeNames.Asset).Set("OmniPBR.mdl")
 
     _layer(lib / "Isaac" / "Robots" / "NVIDIA" / "Bot" / "bot.usd", robot)
-    _layer(lib / "Isaac" / "Robots" / "NVIDIA" / "Bot" / "robot_physics.usda",
-           lambda s: UsdGeom.Xform.Define(s, "/Robot/Physics"))
+    def physics(stage):
+        UsdGeom.Xform.Define(stage, "/Robot/Physics")
+        sh = UsdShade.Shader.Define(stage, "/Robot/Physics/M/Shader")  # same folder, same core MDL
+        sh.GetPrim().CreateAttribute("info:mdl:sourceAsset", Sdf.ValueTypeNames.Asset).Set("OmniPBR.mdl")
+
+    _layer(lib / "Isaac" / "Robots" / "NVIDIA" / "Bot" / "robot_physics.usda", physics)
     url_holder = {}
 
     def props(stage):
@@ -51,7 +55,12 @@ def server(tmp_path_factory):
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     url_holder["root"] = f"http://127.0.0.1:{httpd.server_address[1]}/Assets/Isaac/5.1"
     _layer(lib / "Isaac" / "Props" / "wheel.usda", props)
-    _layer(lib / "Isaac" / "Props" / "hub.usda", lambda s: UsdGeom.Xform.Define(s, "/Hub"))
+    def hub(stage):
+        UsdGeom.Xform.Define(stage, "/Hub")
+        sh = UsdShade.Shader.Define(stage, "/Hub/Looks/M/Shader")   # second layer using a core MDL
+        sh.GetPrim().CreateAttribute("info:mdl:sourceAsset", Sdf.ValueTypeNames.Asset).Set("OmniPBR.mdl")
+
+    _layer(lib / "Isaac" / "Props" / "hub.usda", hub)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield url_holder["root"]
     httpd.shutdown()
@@ -98,3 +107,36 @@ def test_mirrored_stage_composes_offline(mirrored):
 def test_missing_root_raises(server, tmp_path):
     with pytest.raises(FileNotFoundError):
         mirror_usd(server, "/Isaac/Robots/nope.usd", tmp_path)
+
+
+def test_transient_network_error_is_retried(server, tmp_path, monkeypatch):
+    import urllib.request
+    from wildfire_swarm.assets import mirror as m
+    real = urllib.request.urlopen
+    calls = {"n": 0}
+
+    def flaky(url, timeout):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise urllib.error.URLError("temporary failure in name resolution")
+        return real(url, timeout=timeout)
+
+    import urllib.error
+    monkeypatch.setattr(m.urllib.request, "urlopen", flaky)
+    monkeypatch.setattr(m, "RETRY_SLEEP_S", 0.0)
+    rep = mirror_usd(server, "/Isaac/Robots/NVIDIA/Bot/bot.usd", tmp_path)
+    assert rep["downloaded"] == 6 and calls["n"] > 1
+
+
+def test_search_path_names_are_looked_up_once(server, tmp_path, monkeypatch):
+    from wildfire_swarm.assets import mirror as m
+    seen_urls = []
+    real = m._fetch
+
+    def spy(url, dst, timeout):
+        seen_urls.append(url)
+        return real(url, dst, timeout)
+
+    monkeypatch.setattr(m, "_fetch", spy)
+    mirror_usd(server, "/Isaac/Robots/NVIDIA/Bot/bot.usd", tmp_path)
+    assert len(seen_urls) == len(set(seen_urls))

@@ -35,8 +35,12 @@ export WF_HUMBLE_SIF="$WF_SIF_DIR/$(wf_cfg image.humble_sif)"
 if [[ -n "${SLURM_JOB_ID:-}" ]]; then
   export WF_RUN_DIR="${WF_RUN_DIR:-$WF_SCRATCH/runs/${SLURM_JOB_ID}_r${SLURM_RESTART_COUNT:-0}}"
   export ROS_DOMAIN_ID=$((1 + SLURM_JOB_ID % 100))
-  export APPTAINER_TMPDIR="${SLURM_TMPDIR:-${TMPDIR:-/tmp}}/apptainer-tmp-$SLURM_JOB_ID"
+  # Image builds unpack ~25 GB here; node-local /tmp may be smaller, scratch (flash) is not.
+  export APPTAINER_TMPDIR="$WF_SCRATCH/tmp/apptainer-$SLURM_JOB_ID"
 fi
 export ROS_LOCALHOST_ONLY="$(wf_cfg dds.localhost_only)"
 export RMW_IMPLEMENTATION="$(wf_cfg dds.rmw)"
+# Only one wildfire job at a time: setup rewrites the assets a run job reads, and each run
+# job holds a whole L40S. Prints the active job lines; empty output means none.
+wf_active_jobs() { squeue --me --noheader --format='%i %j %T' 2>/dev/null | awk '$2 ~ /^wf_(run|install)$/' || true; }
 unset _wf_here

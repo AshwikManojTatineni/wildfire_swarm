@@ -12,7 +12,7 @@ caches, per-job results) follows the ROB6323 Go2 project.
 ```
 wildfire_swarm/
 ├── install.sh / install.slurm      # CPU setup job: pull Isaac Sim 5.1.0, build images, prepare assets
-├── run.sh / run.slurm              # L40S runtime job: snapshot source, manifest, run one gate, copy results
+├── run.sh / run.slurm              # L40S runtime job: snapshot source, manifest, run the gates in order, copy results
 ├── config/
 │   ├── runtime.yaml                # image/Pegasus pins, rates, DDS, Slurm sizes
 │   ├── mission.yaml                # forest, corridor, spawns, robots, video
@@ -57,8 +57,9 @@ OnDemand and VS Code downloads, and troubleshooting.
 | `install.sh` | CPU only: 10 cores, 20 GB RAM, ≤ 4 h | builds and downloads need no GPU (same as the Go2 install job) |
 | `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, time cap 25 min | G1 (containers) then G3 (scene with robots, 20 s of simulation recorded) in one allocation; the job ends as soon as G3 finishes, usually well under the cap |
 
-The job uses exactly one GPU (`--gres=gpu:1`). `run.sh` refuses to submit while another of your wildfire GPU
-jobs is queued or running, and a single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the
+The job uses exactly one GPU (`--gres=gpu:1`). `install.sh` and `run.sh` refuse to submit while another of
+your wildfire jobs (setup or run) is queued or running. That way setup never rewrites the assets while a run job
+reads them. A single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the
 start-up checks (Go2 sizing). The job requests 32 GB because the forest scene needs NVIDIA's minimum host RAM
 for Isaac Sim 5.1.
 
@@ -83,7 +84,7 @@ logs utilization and peak VRAM to `gpu_summary.json`. Torch cancels jobs with lo
 
 | Path | Contents |
 | --- | --- |
-| `$HOME/wildfire` | this repository and copied results (`results/`; videos git-ignored) |
+| `$HOME/wildfire` | this repository and copied results (`results/`, git-ignored) |
 | `/scratch/$USER/wildfire_work/sif` | Apptainer images, digests and versions |
 | `/scratch/$USER/wildfire_work/assets` | localized forest and Nova Carter assets, `asset_manifest.json` |
 | `/scratch/$USER/wildfire_work/cache` | Kit, shader and compute caches |
