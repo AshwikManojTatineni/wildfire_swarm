@@ -4,7 +4,7 @@
 # Evidence: g3/overview.mp4, g3/chase.mp4, g3/still_*.png, g3/stage_report.json, g3/verdict.json
 set -euo pipefail
 S="$WF_RUN_DIR/src/scripts/cluster"
-[[ -f "$WF_ASSETS/asset_manifest.json" ]] || { echo "G3 FAIL: run ./run.sh g3_prep first"; exit 1; }
+[[ -f "$WF_ASSETS/asset_manifest.json" ]] || { echo "G3 FAIL: run ./install.sh first (it prepares the assets)"; exit 1; }
 mkdir -p "$WF_RUN_DIR/g3"
 set +e
 WF_OFFLINE=1 bash "$S/supervise.sh" \

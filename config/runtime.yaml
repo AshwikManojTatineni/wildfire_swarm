@@ -45,11 +45,29 @@ dds:
   domain_id_rule: "1 + SLURM_JOB_ID % 100"
 
 slurm:
+  # Torch: --account required, no --partition, GPU via --gres + --constraint.
+  # Request only what a step needs; low GPU utilization jobs are auto-cancelled
+  # (L40S nodes gl*: cancel < 50 %, warn < 70 %), so GPU steps are short and render-bound.
   gpu_gres: "gpu:1"
-  gpu_constraint: l40s
-  small:  {cpus: 16, mem: 96G,  time: "02:00:00"}   # gates G1-G5
-  large:  {cpus: 32, mem: 128G, time: "04:00:00"}   # gates G6-G9
-  install: {cpus: 16, mem: 64G, time: "04:00:00"}   # CPU-only build job
+  gpu_constraint: l40s          # 48 GB VRAM + RT cores; A100/H100/H200/B200 lack RT cores (unsupported by Isaac Sim)
+  # --mem is host RAM (Go2 used 10 CPUs / 20 GB). GPU memory is not requested: the job gets the
+  # whole L40S (48 GB VRAM). Values are raised only where a step needs it, and measured
+  # usage (sacct MaxRSS, gpu_summary.json) is recorded to trim them further.
+  gpu_short: {cpus: 10, mem: 20G,  time: "00:30:00"}   # g1_startup, g2_gpu: Go2 sizing, no scene loaded
+  gpu:       {cpus: 10, mem: 32G,  time: "01:00:00"}   # g3_scene: NVIDIA 5.1 minimum host RAM is 32 GB
+  gpu_large: {cpus: 16, mem: 64G,  time: "04:00:00"}   # later four-AMR runs (re-sized from G3 measurements)
+  install:   {cpus: 10, mem: 20G,  time: "04:00:00"}   # CPU only, Go2 install sizing
+
+gpu_budget:
+  # Isaac Sim 5.1 requirements: >= 16 GB VRAM (ideal 48 GB), 32-64 GB RAM, Linux driver 580.65.06 tested.
+  vram_gb_available: 48
+  vram_gb_estimate_g3: 10       # Kit/RTX ~4 + forest textures <= 3.8 + instanced geometry ~0.3 + Carter ~0.6 + 2 cameras ~1
+  vram_gb_estimate_full: 16     # + 3 Carters, 4 RTX LiDARs, 5 thermal/depth render products
+  warn_fraction: 0.8            # run.slurm flags a job whose peak VRAM exceeds 80 % of the GPU
+  tested_driver: "580.65.06"
+
+assets:
+  isaac_root_url: https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1
 
 nvidia_env:
   ACCEPT_EULA: "Y"

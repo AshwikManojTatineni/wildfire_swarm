@@ -98,8 +98,18 @@ def _instances(stage, group):
     prim = stage.GetPrimAtPath(f"/Forest/{group}")
     out = list(prim.GetChildren())
     for p in out:  # placement Xform wraps the referenced model in a child "Model"
-        assert p.GetChild("Model").HasAuthoredReferences(), p.GetPath()
+        model = p.GetChild("Model")
+        assert model.HasAuthoredReferences(), p.GetPath()
+        # Instanced so the GPU stores each species mesh once (~150M -> ~1.6M unique triangles).
+        assert model.IsInstanceable(), p.GetPath()
     return out
+
+
+def test_vegetation_is_instanced(built):
+    stage = Usd.Stage.Open(str(built[0] / "forest.usda"))
+    plants = list(stage.GetPrimAtPath("/Forest/Vegetation").GetChildren())
+    assert plants and all(p.GetChild("Model").IsInstanceable() for p in plants)
+    assert len(stage.GetPrototypes()) <= 6   # one prototype per model file
 
 
 def test_counts_follow_generator_densities(built):

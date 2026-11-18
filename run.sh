@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 # Login-node submitter for one verification gate (Go2 train.sh pattern, adapted to
-# Torch: direct sbatch, --gres=gpu:1 --constraint=l40s, no partition).
-#   ./run.sh g1_startup | g2_gpu | g3_prep | g3_scene   [extra args passed to the gate]
+# Torch: direct sbatch, --account from config, --gres=gpu:1 --constraint=l40s, no partition).
+# Every gate runs the simulator, so every gate gets one L40S (setup work is in install.sh).
+#   ./run.sh g1_startup | g2_gpu | g3_scene   [extra args passed to the gate]
 set -euo pipefail
 cd "$(dirname "$0")"
-GATE="${1:?usage: ./run.sh <gate> [args]   (gates: g1_startup g2_gpu g3_prep g3_scene)}"
+GATE="${1:?usage: ./run.sh <gate> [args]   (gates: g1_startup g2_gpu g3_scene)}"
 [[ -f "scripts/gates/$GATE.sh" ]] || { echo "unknown gate: $GATE" >&2; exit 2; }
 source scripts/cluster/wf_env.sh
 if [[ -n "$(git status --porcelain --untracked-files=no)" && "${WF_ALLOW_DIRTY:-0}" != 1 ]]; then
   echo "Working tree has uncommitted changes; the job snapshots HEAD. Commit, or set WF_ALLOW_DIRTY=1." >&2
   exit 2
 fi
-size=small; case "$GATE" in g[6-9]*) size=large ;; esac
+case "$GATE" in
+  g1_*|g2_*) size=gpu_short ;;
+  g[6-9]_*)  size=gpu_large ;;
+  *)         size=gpu ;;
+esac
+mail=(); [[ -n "${MAIL_USER:-}" ]] && mail=(--mail-type=END,FAIL --mail-user="$MAIL_USER")
 mkdir -p "$WF_SCRATCH/slurm_logs"
 sbatch --account="$SLURM_ACCOUNT" \
   --job-name="wf_${GATE}" \
@@ -20,5 +26,6 @@ sbatch --account="$SLURM_ACCOUNT" \
   --mem="$(wf_cfg "slurm.$size.mem")" \
   --time="$(wf_cfg "slurm.$size.time")" \
   --output="$WF_SCRATCH/slurm_logs/${GATE}_%j.out" \
+  "${mail[@]}" \
   --export=ALL,WF_ALLOW_DIRTY="${WF_ALLOW_DIRTY:-0}" \
   run.slurm "$@"

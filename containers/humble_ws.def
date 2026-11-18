@@ -2,7 +2,8 @@ Bootstrap: docker
 From: osrf/ros:humble-desktop
 
 # External ROS 2 Humble environment (Ubuntu 22.04, native Python 3.10) for Nav2,
-# robot_localization, RTAB-Map ICP odometry and mission nodes.
+# robot_localization, RTAB-Map ICP odometry and mission nodes, plus
+# usd-core for CPU-side asset preparation.
 # Never sourced into the Isaac Sim process; talks to it over Fast DDS UDP.
 
 %post
@@ -13,10 +14,13 @@ From: osrf/ros:humble-desktop
         ros-humble-navigation2 ros-humble-nav2-bringup \
         ros-humble-robot-localization ros-humble-rtabmap-odom \
         ros-humble-rmw-fastrtps-cpp ros-humble-tf2-tools \
-        python3-colcon-common-extensions build-essential
+        python3-colcon-common-extensions build-essential python3-pip curl
     rm -rf /var/lib/apt/lists/*
+    # usd-core: CPU-side asset preparation (forest export, Nova Carter mirror) and unit tests.
+    python3 -m pip install --no-cache-dir "usd-core>=24.11,<27" "pytest>=7,<9" "pyyaml>=6,<7" "numpy>=1.21,<2"
     dpkg-query -W -f='${Package} ${Version}\n' 'ros-humble-*' > /opt/versions.txt
     python3 --version >> /opt/versions.txt
+    python3 -m pip freeze >> /opt/versions.txt
 
 %labels
     org.wildfire.role external-humble
@@ -25,3 +29,4 @@ From: osrf/ros:humble-desktop
     python3 -c "import sys; assert sys.version_info[:2] == (3, 10), sys.version"
     test -f /opt/ros/humble/share/nav2_bringup/package.xml
     test -f /opt/ros/humble/share/robot_localization/package.xml
+    python3 -c "from pxr import Usd, UsdUtils; print('usd-core', Usd.GetVersion())"

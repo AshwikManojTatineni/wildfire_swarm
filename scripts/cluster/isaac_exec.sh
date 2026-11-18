@@ -37,6 +37,7 @@ env_args=(
   --env "LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.bridge/humble/lib"
   --env "WF_ASSET_ROOT=/workspace/assets"
   --env "PYTHONPATH=/workspace/src/source/wildfire_swarm"
+  --env "PYTHONNOUSERSITE=1"
   --env "WF_RUN=/workspace/run"
   --env "SLURM_JOB_ID=${SLURM_JOB_ID:-local}"
 )

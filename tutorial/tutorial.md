@@ -1,30 +1,33 @@
 # Tutorial: running the wildfire swarm on Torch
 
-Each step below is one Slurm job, submitted from a Torch login node. Each one writes its evidence to
-`results/<jobid>_r0/` and exits non-zero if its check fails. Run the steps in order. A later step assumes
-the earlier ones passed.
+Like the Go2 project, there are two kinds of job:
 
-## 0. Connect and clone
+- **Setup** (`./install.sh`): one CPU-only job that builds the containers and prepares the assets.
+- **Runs** (`./run.sh <gate>`): one job per step, each with one L40S GPU. Every run renders the simulator.
 
-Connect to Torch (`ssh torch`, NYU VPN off campus; see the
-[Torch connection guide](https://services.rt.nyu.edu/docs/hpc/connecting_to_hpc/connecting_to_hpc/)), then:
+Every job writes its evidence to `~/wildfire/results/<jobid>_r0/` and exits non-zero if its check fails.
+Run the steps in order.
+
+## 0. Connect and clone (login node, light work only)
+
+Connect with `ssh torch` (off campus, use the NYU VPN; see the
+[Torch connection guide](https://services.rt.nyu.edu/docs/hpc/connecting_to_hpc/connecting_to_hpc/)).
+
+Clone into your home directory. Torch backs up `$HOME`, but `/scratch` is not backed up and is purged after
+60 days without access.
 
 ```bash
-cd /scratch/$USER
+cd $HOME
 git clone <your-repo-url> wildfire
 cd wildfire
 cp config/torch.env.example config/torch.env
 my_slurm_accounts                     # copy your torch_pr_... account into config/torch.env
 ```
 
-Optional local checks on the login node (they are light):
+Large data never goes in `$HOME`. Images, caches, assets and raw runs go to `/scratch/$USER/wildfire_work`.
+Nothing is pip- or conda-installed into `$HOME`: all Python packages live inside the container images.
 
-```bash
-python3 -m pip install --user pyyaml pytest usd-core numpy
-make check
-```
-
-## 1. Install (CPU job, about 1 h)
+## 1. Setup job (CPU only, about 1–1.5 h)
 
 ```bash
 ./install.sh
@@ -32,67 +35,56 @@ squeue --me
 tail -f /scratch/$USER/wildfire_work/slurm_logs/install_<jobid>.out
 ```
 
-This job:
+The setup job does the following, all on a CPU compute node:
 
-- pulls `nvcr.io/nvidia/isaac-sim:5.1.0`
-- builds `isaac_pegasus.sif` (Pegasus v5.1.0 at its pinned commit) and `humble_ws.sif` with `--fakeroot`
-- clones the forest generator at its pinned commit
-- writes `wildfire_work/sif/digests.txt`
+1. Pulls `nvcr.io/nvidia/isaac-sim:5.1.0`.
+2. Builds `isaac_pegasus.sif` (Isaac Sim + Pegasus v5.1.0) and `humble_ws.sif` (ROS 2 Humble + usd-core) with `--fakeroot`.
+3. Clones the forest generator at its pinned commit.
+4. Exports the seeded forest. About 600 MB, mostly textures.
+5. Downloads the Nova Carter robot and everything it references from the Isaac Sim 5.1 asset library. About 820 files, 425 MB.
+6. Runs the unit tests.
+
+The summary is written to `results/install_<jobid>/summary.json`.
 
 | Problem | Fix |
 | --- | --- |
 | Exit code 3 | `--fakeroot` is not available. Contact hpc@nyu.edu. |
 | The pull is denied | Put an NGC API key in `NGC_API_KEY` in `config/torch.env`. |
+| Scratch was purged, or `config/mission.yaml` changed | `./install.sh --assets-only` |
 
-## 2. G1: container startup
+## 2. G1: container startup (L40S, ≤ 30 min)
 
 ```bash
 ./run.sh g1_startup
 ```
 
-Pass: `results/<job>_r0/g1/summary.json` shows `isaac_python` 3.11.x, `pegasus_import: true` and
-`iris_in_robots: true`, and `g1/humble.txt` shows Python 3.10 and the Nav2, robot_localization and
-rtabmap_odom prefixes.
+Pass: `results/<job>_r0/g1/summary.json` shows:
+- `isaac_python` 3.11.x
+- `pegasus_import: true`
+- `iris_in_robots: true`
 
-## 3. G2: GPU visibility
+`g1/humble.txt` shows Python 3.10 and the Nav2, robot_localization and rtabmap_odom prefixes.
+
+## 3. G2: GPU visibility (L40S, ≤ 30 min)
 
 ```bash
 ./run.sh g2_gpu
 ```
 
 Pass: `g2/summary.json` has `l40s: true`, `same_gpu_in_container: true` and `compat_passed: true`. The
-driver version is recorded next to the version Pegasus was tested with (550.163.01).
+driver is recorded next to the version Isaac Sim 5.1 was tested on (580.65.06).
 
-## 4. G3 prep: localize assets (network needed)
-
-```bash
-./run.sh g3_prep
-```
-
-This exports the seeded forest to `wildfire_work/assets/forest/`. It also mirrors the Nova Carter USD,
-with everything it references, from the Isaac Sim 5.1 asset library to `wildfire_work/assets/isaac/`.
-
-Pass: `g3_prep/summary.json` has no errors, a `nova_carter_rel` path and no forest remote references.
-Run it again only after a scratch purge or a change to `config/mission.yaml`.
-
-## 5. G3: forest and robots, with video
+## 4. G3: forest and robots, with video (L40S, ≤ 1 h)
 
 ```bash
 ./run.sh g3_scene
 ```
 
 This step loads the forest, the Iris (parked on the takeoff patch) and one Nova Carter from local files
-only. It runs at 240 Hz physics and 60 Hz rendering, drives the Carter along the corridor and records two
-20 s videos.
+only. It runs at 240 Hz physics and 60 Hz rendering, drives the Carter 4 m along the corridor and records
+two 20 s videos.
 
-| File | Contents |
-| --- | --- |
-| `g3/overview.mp4`, `g3/chase.mp4` | videos (git-ignored) |
-| `g3/still_*.png` | stills |
-| `g3/stage_report.json` | timing, Carter joints and pose, collider hits |
-| `g3/verdict.json` | each pass rule with its measured value |
-
-Pass, when every one of these is true:
+Pass, when every one of these is true in `g3/verdict.json`:
 
 | Rule | Condition |
 | --- | --- |
@@ -100,7 +92,53 @@ Pass, when every one of these is true:
 | `terrain_collider_ok`, `trunk_collider_ok` | the raycasts hit the terrain and a tree trunk |
 | `rates_ok` | mean physics step is 1/240 s, with 4 physics steps per render |
 | `carter_drove_ok` | the Carter moves ≥ 2 m forward, drifts ≤ 0.5 m sideways and doesn't fall |
-| `video_ok` | at least 90% of the expected frames are in both videos |
+| `video_ok` | at least 90 % of the expected frames are in both videos |
+
+## 5. Getting the simulation video and results
+
+At the end of each run job, the Slurm log prints the video paths:
+
+```
+== video: /home/<netid>/wildfire/results/<jobid>_r0/g3/overview.mp4 (12M)
+== video: /home/<netid>/wildfire/results/<jobid>_r0/g3/chase.mp4 (11M)
+```
+
+`results/latest` always points to the most recent run.
+
+| File | Contents |
+| --- | --- |
+| `g3/overview.mp4` | wide shot of the corridor, Carter and Iris |
+| `g3/chase.mp4` | camera following the Carter |
+| `g3/still_*.png` | first and middle frames |
+| `g3/verdict.json`, `g3/stage_report.json` | pass rules, measured values, timing, Carter joints and pose |
+| `gpu_summary.json` | mean and peak GPU utilization and peak VRAM for the job |
+| `manifest.json` | node, GPU, driver, image digests, git SHA, exact command |
+
+**Option A: copy to your laptop with `scp`** (run on your laptop; uses the same `torch` SSH alias as login):
+
+```bash
+scp -r torch:wildfire/results/latest/g3 ./wildfire_g3
+```
+
+or a single file:
+
+```bash
+scp torch:wildfire/results/<jobid>_r0/g3/overview.mp4 .
+```
+
+For large or many files, use the data transfer node `dtn.torch.hpc.nyu.edu` instead of the login node.
+
+**Option B: Open OnDemand.** Log in to Torch Open OnDemand
+([guide](https://services.rt.nyu.edu/docs/hpc/ood/ood_intro/)), open **Files → Home Directory →
+wildfire/results/<jobid>_r0/g3/**, then select `overview.mp4` and click **Download**. The browser can
+also play it directly.
+
+**Option C: VS Code Remote-SSH.** Open `~/wildfire/results/latest/g3/` in the Explorer, then right-click
+`overview.mp4` and choose **Download…**.
+
+Videos are git-ignored, so they never end up in the repository. Each run's video pair is about 20–40 MB in
+`$HOME` (50 GB quota). Check your usage with `myquota`, and delete old `results/<jobid>_r0/` folders you no
+longer need.
 
 ## Where to look when something fails
 
@@ -109,4 +147,7 @@ Pass, when every one of these is true:
 | Slurm output | `/scratch/$USER/wildfire_work/slurm_logs/<gate>_<jobid>.out` |
 | Child process logs | `results/<job>_r0/*.log.tail`; full logs in `wildfire_work/runs/<job>_r0/logs/` |
 | Exact code that ran | `wildfire_work/runs/<job>_r0/src/` (snapshot of the committed `HEAD`) |
-| Hardware, image digests and command | `results/<job>_r0/manifest.json` |
+| Job state and exit reason | `sacct -j <jobid> --format=JobID,State,ExitCode,Elapsed,MaxRSS,ReqTRES` |
+
+If a job shows `CANCELLED` and `gpu_summary.json` shows low `util_mean_pct`, Torch's low-GPU-utilization
+policy cancelled it (L40S nodes: cancel below 50 %, warning below 70 %).

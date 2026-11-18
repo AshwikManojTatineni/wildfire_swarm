@@ -137,7 +137,11 @@ def _place(stage, path, ref, xyz, yaw_deg, scale):
     # Placement lives on our own Xform; the model (which carries its own root
     # xformOps) is referenced on a child so the two op stacks never collide.
     xf = UsdGeom.Xform.Define(stage, path)
-    UsdGeom.Xform.Define(stage, path + "/Model").GetPrim().GetReferences().AddReference(ref)
+    model = UsdGeom.Xform.Define(stage, path + "/Model").GetPrim()
+    model.GetReferences().AddReference(ref)
+    # Instanceable: the renderer/BVH store each model's mesh once, not once per tree.
+    # Colliders stay on the (non-instanced) placement Xform, so physics is unaffected.
+    model.SetInstanceable(True)
     xf.AddTranslateOp().Set(Gf.Vec3d(*map(float, xyz)))
     xf.AddOrientOp().Set(_yaw_quat(yaw_deg))
     xf.AddScaleOp().Set(Gf.Vec3f(*map(float, scale)))

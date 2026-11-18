@@ -8,7 +8,10 @@ set -euo pipefail
 
 cd "${SLURM_SUBMIT_DIR:?}"
 source scripts/cluster/wf_env.sh
-FORCE=0; [[ "${1:-}" == "--force" ]] && FORCE=1
+FORCE=0; ASSETS_ONLY=0
+for a in "$@"; do
+  case "$a" in --force) FORCE=1 ;; --assets-only) ASSETS_ONLY=1 ;; *) echo "unknown option $a" >&2; exit 2 ;; esac
+done
 
 mkdir -p "$WF_SIF_DIR" "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR" "$WF_SRC_CACHE" "$WF_ASSETS"
 LOG="$WF_SIF_DIR/install_${SLURM_JOB_ID}.log"
@@ -20,6 +23,7 @@ echo "-- network check (needed for pulls/clones on compute nodes):"
 curl -sS -o /dev/null -w "nvcr.io %{http_code}\n" https://nvcr.io/v2/ || true
 curl -sS -o /dev/null -w "github %{http_code}\n" https://github.com || true
 
+if [[ $ASSETS_ONLY == 0 ]]; then
 BASE_REF="$(wf_cfg image.base)"
 BASE_SIF="$WF_SIF_DIR/isaac-sim_5.1.0.sif"
 PEG_COMMIT="$(wf_cfg pegasus.commit)"
@@ -66,7 +70,9 @@ if [[ ! -f "$WF_HUMBLE_SIF" || $FORCE == 1 ]]; then
   mv "$WF_HUMBLE_SIF.tmp" "$WF_HUMBLE_SIF"
 fi
 
-# 5. Forest generator source at the pinned commit (models are localized by g3_prep).
+fi  # ASSETS_ONLY
+
+# 5. Forest generator source at the pinned commit (its models are exported in step 6).
 FOREST_DIR="$WF_SRC_CACHE/forest_generator"
 FOREST_COMMIT="$(wf_cfg forest.generator_commit)"
 if [[ ! -d "$FOREST_DIR/.git" ]]; then
@@ -76,10 +82,24 @@ git -C "$FOREST_DIR" fetch -q origin || true
 git -C "$FOREST_DIR" -c advice.detachedHead=false checkout -q "$FOREST_COMMIT"
 test "$(git -C "$FOREST_DIR" rev-parse HEAD)" = "$FOREST_COMMIT"
 
-# 6. Digests + versions for the run manifest.
+# 6. Asset preparation (CPU): seeded forest export + Nova Carter mirror over HTTPS, inside
+#    humble_ws.sif with usd-core. Runs from a snapshot of the committed source, like a gate.
+mkdir -p "$WF_RUN_DIR"/{src,logs,tmp,home}
+git -C "$WF_REPO" archive HEAD | tar -x -C "$WF_RUN_DIR/src"
+WF_ASSETS_RW=1 bash scripts/cluster/ros_exec.sh 'python3 /workspace/src/scripts/cluster/prepare_assets.py'
+cp "$WF_ASSETS/asset_manifest.json" "$WF_RUN_DIR/assets/asset_manifest.json"
+
+# 7. Local checks on the compute node (nothing is pip-installed into $HOME).
+bash scripts/cluster/ros_exec.sh 'cd /workspace/src && PXR_USDC_EMIT_DEPRECATION_WARNINGS=0 python3 -m pytest -q -p no:cacheprovider'   | tee "$WF_RUN_DIR/assets/pytest.txt"
+
+# 8. Digests + versions for the run manifests.
 ( cd "$WF_SIF_DIR" && sha256sum ./*.sif ) > "$WF_SIF_DIR/digests.txt"
 apptainer exec "$WF_ISAAC_SIF" cat /opt/pegasus_commit /opt/isaac_pip_freeze.txt > "$WF_SIF_DIR/isaac_versions.txt"
 apptainer exec "$WF_HUMBLE_SIF" cat /opt/versions.txt > "$WF_SIF_DIR/humble_versions.txt"
 echo "forest_generator $FOREST_COMMIT" >> "$WF_SIF_DIR/digests.txt"
 cat "$WF_SIF_DIR/digests.txt"
-echo "== install OK $(date -u +%FT%TZ)"
+
+OUT="$WF_REPO/results/install_${SLURM_JOB_ID}"
+mkdir -p "$OUT"
+cp "$WF_RUN_DIR/assets/summary.json" "$WF_RUN_DIR/assets/pytest.txt" "$WF_SIF_DIR/digests.txt" "$OUT/"
+echo "== install OK $(date -u +%FT%TZ); summary in $OUT"

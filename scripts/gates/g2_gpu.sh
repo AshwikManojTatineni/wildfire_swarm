@@ -26,6 +26,7 @@ s = {
   "same_gpu_in_container": sorted(host) == sorted(cont),
   "driver": cont[0].split(",")[2].strip() if cont else None,
   "pegasus_tested_driver": "550.163.01",
+  "isaac_sim_5_1_tested_driver": "580.65.06",
   "compat_passed": "System checking result: PASSED" in compat,
   "compat_exit": crc,
 }
