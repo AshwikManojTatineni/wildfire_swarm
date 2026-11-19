@@ -34,7 +34,7 @@ wildfire_swarm/
 Clone into your home directory: code belongs in backed-up `$HOME`, and large data goes to `/scratch`.
 
 ```bash
-cd $HOME && git clone <your-repo-url> wildfire && cd wildfire   # no config needed: account auto-detected
+cd $HOME && git clone <your-repo-url> wildfire && cd wildfire   # no config needed: account torch_pr_742
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
 ./run.sh                                        # ONE job on ONE L40S: g1_startup -> g3_scene
 ```

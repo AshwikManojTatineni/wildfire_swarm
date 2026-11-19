@@ -19,26 +19,23 @@ if ! bash -n "$_wf_here/config/torch.env" 2>/dev/null; then
 fi
 # shellcheck disable=SC1091
 source "$_wf_here/config/torch.env"
-# Slurm account: the one set in torch.env, else inside a job the job's own account, else the
-# first account Slurm lists for this user (what `my_slurm_accounts` shows).
-if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; then
-  # Any account except the login default `users` (sbatch rejects it). The real name is the allocation's
-  # slurm_account_name in projects.hpc.nyu.edu; only its torch_pr_ prefix is documented, so no format is assumed.
-  SLURM_ACCOUNT="${SLURM_JOB_ACCOUNT:-$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | awk 'NF && $0 != "users"' | head -n 1 || true)}"
-fi
-if [[ -z "${SLURM_ACCOUNT:-}" ]]; then
-  echo "wf_env: no project account for $USER yet (my_slurm_accounts shows only 'users')." >&2
-  echo "  Your PI must request an allocation for your project at https://projects.hpc.nyu.edu and give you access." >&2
-  return 2 2>/dev/null || exit 2
-fi
-
-export SLURM_ACCOUNT
 # The repo is wherever this checkout lives (any folder name); torch.env does not set it.
 export WF_REPO="$_wf_here"
 export WF_SCRATCH="${WF_SCRATCH:-/scratch/$USER/wildfire_work}"
 export WF_CFG="$WF_REPO/config/runtime.yaml"
 wf_cfg() { python3 "$WF_REPO/scripts/cluster/cfg.py" "$WF_CFG" "$1"; }
 export -f wf_cfg
+
+# Slurm account: torch.env if set; inside a job, the job's own account; otherwise the project
+# account from runtime.yaml (slurm.account, project 742). If Slurm lists a longer name that starts
+# with it (e.g. torch_pr_742_<suffix>), that exact listed name is used.
+if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; then
+  _wf_acct="$(wf_cfg slurm.account)"
+  _wf_listed="$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | grep "^${_wf_acct}" | head -n 1 || true)"
+  SLURM_ACCOUNT="${SLURM_JOB_ACCOUNT:-${_wf_listed:-$_wf_acct}}"
+  unset _wf_acct _wf_listed
+fi
+export SLURM_ACCOUNT
 
 export WF_SIF_DIR="$WF_SCRATCH/sif"
 export WF_CACHE="$WF_SCRATCH/cache"

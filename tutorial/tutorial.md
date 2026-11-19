@@ -23,9 +23,13 @@ git clone <your-repo-url> wildfire
 cd wildfire
 ```
 
-There is nothing to configure. The scripts use your first Slurm account (the one `my_slurm_accounts`
-lists) and print it when they submit (`Slurm account: ...`). To use a different account, set
-`SLURM_ACCOUNT` in `config/torch.env`, which is created automatically on the first run.
+There is nothing to configure. Jobs use the project account `torch_pr_742` (set as `slurm.account` in
+`config/runtime.yaml`). If `my_slurm_accounts` lists a longer name that starts with it, that exact name is
+used instead. The scripts print the account when they submit (`Slurm account: ...`). To use a different
+account, set `SLURM_ACCOUNT` in `config/torch.env`, which is created automatically on the first run.
+
+The project needs an **Active** allocation in [projects.hpc.nyu.edu](https://projects.hpc.nyu.edu) first.
+Only the PI can request one; ask for the **Torch** resource, which includes the L40S GPUs.
 
 Any folder name works for the clone, because the scripts find the repo from their own location. The paths
 below assume `~/wildfire`.

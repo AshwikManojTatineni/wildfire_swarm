@@ -18,7 +18,7 @@ def get(key):
 def test_scalars_match_pyyaml():
     ref = yaml.safe_load(YAML.read_text())
     for key in ["image.base", "image.isaac_sif", "image.humble_sif", "pegasus.commit", "pegasus.tag",
-                "dds.rmw", "slurm.gpu_constraint", "slurm.gpu_short.cpus", "slurm.gpu.mem", "assets.isaac_root_url",
+                "dds.rmw", "slurm.account", "slurm.gpu_constraint", "slurm.gpu_short.cpus", "slurm.gpu.mem", "assets.isaac_root_url",
                 "slurm.gpu_short.time", "slurm.gpu_large.time", "gpu_budget.warn_fraction", "rates.physics_hz", "nvidia_env.PRIVACY_CONSENT"]:
         node = ref
         for part in key.split("."):
