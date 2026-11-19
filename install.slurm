@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --requeue
-#SBATCH --account=torch_pr_742
+#SBATCH --account=torch_pr_742_general
 #SBATCH --mail-type=END,FAIL
 set -euo pipefail
 

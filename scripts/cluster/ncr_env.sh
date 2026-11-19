@@ -27,8 +27,7 @@ ncr_cfg() { python3 "$NCR_REPO/scripts/cluster/cfg.py" "$NCR_CFG" "$1"; }
 export -f ncr_cfg
 
 # Slurm account: torch.env if set; inside a job, the job's own account; otherwise the project
-# account from runtime.yaml (slurm.account, project 742). If Slurm lists a longer name that starts
-# with it (e.g. torch_pr_742_<suffix>), that exact listed name is used.
+# account from runtime.yaml (slurm.account = torch_pr_742_general).
 if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; then
   _wf_acct="$(ncr_cfg slurm.account)"
   _wf_listed="$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | grep "^${_wf_acct}" | head -n 1 || true)"

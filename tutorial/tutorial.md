@@ -23,9 +23,11 @@ git clone <your-repo-url> narrow_corridor_robot
 cd narrow_corridor_robot
 ```
 
-There is nothing to configure. Jobs use the project account `torch_pr_742` (set as `slurm.account` in
-`config/runtime.yaml`). If `my_slurm_accounts` lists a longer name that starts with it, that exact name is
-used instead. The scripts print the account when they submit (`Slurm account: ...`). To use a different
+There is nothing to configure. Jobs use the project account `torch_pr_742_general`: project 742's general
+Torch allocation, which reaches the L40S GPUs. It is set as `slurm.account` in `config/runtime.yaml` and in
+the `#SBATCH` headers. Don't use `torch_pr_742_tandon_advanced` for these jobs: its A100/H100/H200 GPUs have
+no RT cores, so Isaac Sim can't render on them. The scripts print the account when they submit
+(`Slurm account: ...`). To use a different
 account, set `SLURM_ACCOUNT` in `config/torch.env`, which is created automatically on the first run.
 
 The project needs an **Active** allocation in [projects.hpc.nyu.edu](https://projects.hpc.nyu.edu) first.

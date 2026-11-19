@@ -34,7 +34,7 @@ narrow_corridor_robot/
 Clone into your home directory: code belongs in backed-up `$HOME`, and large data goes to `/scratch`.
 
 ```bash
-cd $HOME && git clone <your-repo-url> narrow_corridor_robot && cd narrow_corridor_robot   # no config needed: account torch_pr_742
+cd $HOME && git clone <your-repo-url> narrow_corridor_robot && cd narrow_corridor_robot   # no config needed: account torch_pr_742_general
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
 ./run.sh                                        # ONE job on ONE L40S: g1_startup -> g3_scene
 ```

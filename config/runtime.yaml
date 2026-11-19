@@ -39,7 +39,7 @@ dds:
   localhost_only: 1   # profile: containers/fastdds_udp.xml (UDPv4 only); domain id: scripts/cluster/ncr_env.sh
 
 slurm:
-  account: torch_pr_742        # HPC project 742 (PI rl4294); override with SLURM_ACCOUNT in config/torch.env
+  account: torch_pr_742_general   # project 742 general Torch allocation (L40S). Not tandon_advanced: A100/H100/H200, no RT cores
   # Torch: --account required, no --partition, GPU via --gres + --constraint.
   # Request only what a step needs; low GPU utilization jobs are auto-cancelled
   # (L40S nodes gl*: cancel < 50 %, warn < 70 %), so GPU steps are short and render-bound.
