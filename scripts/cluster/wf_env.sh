@@ -12,15 +12,23 @@ if [[ ! -e "$_wf_here/.git" ]]; then
 fi
 # Optional overrides; created from the example on first use, so no manual copy is needed.
 [[ -f "$_wf_here/config/torch.env" ]] || cp "$_wf_here/config/torch.env.example" "$_wf_here/config/torch.env"
+if ! bash -n "$_wf_here/config/torch.env" 2>/dev/null; then
+  echo "wf_env: config/torch.env has a syntax error (often a mangled paste). Delete it; it is recreated:" >&2
+  echo "  rm $_wf_here/config/torch.env" >&2
+  return 2 2>/dev/null || exit 2
+fi
 # shellcheck disable=SC1091
 source "$_wf_here/config/torch.env"
 # Slurm account: the one set in torch.env, else inside a job the job's own account, else the
 # first account Slurm lists for this user (what `my_slurm_accounts` shows).
 if [[ -z "${SLURM_ACCOUNT:-}" || "$SLURM_ACCOUNT" == torch_pr_XXXX_XXXXX ]]; then
-  SLURM_ACCOUNT="${SLURM_JOB_ACCOUNT:-$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | awk 'NF' | head -n 1)}"
+  # Any account except the login default `users` (sbatch rejects it). The real name is the allocation's
+  # slurm_account_name in projects.hpc.nyu.edu; only its torch_pr_ prefix is documented, so no format is assumed.
+  SLURM_ACCOUNT="${SLURM_JOB_ACCOUNT:-$(sacctmgr -n -P show assoc user="$USER" format=account 2>/dev/null | awk 'NF && $0 != "users"' | head -n 1 || true)}"
 fi
 if [[ -z "${SLURM_ACCOUNT:-}" ]]; then
-  echo "wf_env: no Slurm account found for $USER (my_slurm_accounts lists none)" >&2
+  echo "wf_env: no project account for $USER yet (my_slurm_accounts shows only 'users')." >&2
+  echo "  Your PI must request an allocation for your project at https://projects.hpc.nyu.edu and give you access." >&2
   return 2 2>/dev/null || exit 2
 fi
 
