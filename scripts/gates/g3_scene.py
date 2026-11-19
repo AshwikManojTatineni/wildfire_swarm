@@ -1,7 +1,7 @@
 """G3 scene gate: forest + real robot assets load offline at 240 Hz physics / 60 Hz render,
 colliders work, the Carter drives along the corridor, and the run is recorded to video.
 
-Run inside isaac_pegasus.sif with WF_OFFLINE=1 (black-hole proxy) and read-only assets.
+Run inside isaac_pegasus.sif with NCR_OFFLINE=1 (black-hole proxy) and read-only assets.
 Evidence in /workspace/run/g3/: overview.mp4, chase.mp4, still_*.png, stage_report.json,
 verdict.json. The video is gate evidence (Go2 play.py --video pattern), not a pass by itself.
 """
@@ -152,7 +152,7 @@ cam_chase = Camera("/World/Cameras/Chase", resolution=(W, H),
 
 # --- Physics step accounting -------------------------------------------------------------------
 phys_dts = []
-world.add_physics_callback("wf_dt_probe", lambda dt: phys_dts.append(dt))
+world.add_physics_callback("ncr_dt_probe", lambda dt: phys_dts.append(dt))
 
 world.reset()
 for cam in (cam_over, cam_chase):

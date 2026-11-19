@@ -23,7 +23,7 @@ From: osrf/ros:humble-desktop
     python3 -m pip freeze >> /opt/versions.txt
 
 %labels
-    org.wildfire.role external-humble
+    org.ncr.role external-humble
 
 %test
     python3 -c "import sys; assert sys.version_info[:2] == (3, 10), sys.version"

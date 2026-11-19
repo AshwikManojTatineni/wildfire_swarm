@@ -39,9 +39,9 @@ From: {{ BASE_SIF }}
     chmod -R a+rX /isaac-sim/kit/python 2>/dev/null || true
 
 %labels
-    org.wildfire.base nvcr.io/nvidia/isaac-sim:5.1.0
-    org.wildfire.pegasus_tag {{ PEGASUS_TAG }}
-    org.wildfire.pegasus_commit {{ PEGASUS_COMMIT }}
+    org.ncr.base nvcr.io/nvidia/isaac-sim:5.1.0
+    org.ncr.pegasus_tag {{ PEGASUS_TAG }}
+    org.ncr.pegasus_commit {{ PEGASUS_COMMIT }}
 
 %test
     /isaac-sim/python.sh -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version; print(sys.version)"

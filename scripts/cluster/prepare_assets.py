@@ -14,8 +14,8 @@ from pathlib import Path
 import yaml
 from pxr import Usd, UsdPhysics
 
-from wildfire_swarm.assets.mirror import mirror_usd
-from wildfire_swarm.forest.build_forest import build_forest
+from narrow_corridor_robot.assets.mirror import mirror_usd
+from narrow_corridor_robot.forest.build_forest import build_forest
 
 ASSETS = Path("/workspace/assets")
 OUT = Path("/workspace/run/assets")

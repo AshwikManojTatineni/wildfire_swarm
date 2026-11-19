@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--command", required=True)
     args = ap.parse_args()
     env = os.environ
-    sif_dir, repo = env.get("WF_SIF_DIR", ""), env.get("WF_REPO", "")
+    sif_dir, repo = env.get("NCR_SIF_DIR", ""), env.get("NCR_REPO", "")
     sel = ["-i", env["CUDA_VISIBLE_DEVICES"].split(",")[0]] if env.get("CUDA_VISIBLE_DEVICES") else []
     gpu = sh("nvidia-smi", *sel, "--query-gpu=name,uuid,driver_version,memory.total", "--format=csv,noheader")
     digests = {}
@@ -38,7 +38,7 @@ def main():
     manifest = {
         "job_id": env.get("SLURM_JOB_ID"),
         "restart": env.get("SLURM_RESTART_COUNT", "0"),
-        "gate": env.get("WF_GATE"),
+        "gate": env.get("NCR_GATE"),
         "command": args.command,
         "node": platform.node(),
         "cpus": env.get("SLURM_CPUS_PER_TASK"),
@@ -52,7 +52,7 @@ def main():
         "git_sha": sh("git", "-C", repo, "rev-parse", "HEAD"),
         "git_dirty": bool(sh("git", "-C", repo, "status", "--porcelain", "--untracked-files=no")),
         "ros_domain_id": env.get("ROS_DOMAIN_ID"),
-        "run_dir": env.get("WF_RUN_DIR"),
+        "run_dir": env.get("NCR_RUN_DIR"),
         "start_utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
     Path(args.out).write_text(json.dumps(manifest, indent=2))

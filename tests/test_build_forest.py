@@ -8,7 +8,7 @@ import pytest
 import yaml
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
 
-from wildfire_swarm.forest.build_forest import build_forest, terrain_height
+from narrow_corridor_robot.forest.build_forest import build_forest, terrain_height
 
 ROOT = Path(__file__).resolve().parents[1]
 PARAMS = yaml.safe_load((ROOT / "config" / "mission.yaml").read_text())["forest"]

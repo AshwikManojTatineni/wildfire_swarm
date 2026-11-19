@@ -1,5 +1,5 @@
 # Single source of runtime pins and schedules.
-# install.slurm, run.slurm, scripts/ and source/wildfire_swarm read this file.
+# install.slurm, run.slurm, scripts/ and source/narrow_corridor_robot read this file.
 
 image:
   base: nvcr.io/nvidia/isaac-sim:5.1.0
@@ -36,7 +36,7 @@ sensors:
 
 dds:
   rmw: rmw_fastrtps_cpp
-  localhost_only: 1   # profile: containers/fastdds_udp.xml (UDPv4 only); domain id: scripts/cluster/wf_env.sh
+  localhost_only: 1   # profile: containers/fastdds_udp.xml (UDPv4 only); domain id: scripts/cluster/ncr_env.sh
 
 slurm:
   account: torch_pr_742        # HPC project 742 (PI rl4294); override with SLURM_ACCOUNT in config/torch.env

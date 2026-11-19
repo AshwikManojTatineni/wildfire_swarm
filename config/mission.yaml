@@ -3,7 +3,7 @@
 
 forest:
   # Port of joevento's generator algorithm (Perlin terrain, age-scaled trees, rocks,
-  # clustered vegetation), made seeded and headless. See source/wildfire_swarm/wildfire_swarm/forest/build_forest.py.
+  # clustered vegetation), made seeded and headless. See source/narrow_corridor_robot/narrow_corridor_robot/forest/build_forest.py.
   seed: 20261117
   size_m: [80.0, 60.0]          # x (corridor axis), y
   grid_m: 0.5                   # terrain mesh resolution

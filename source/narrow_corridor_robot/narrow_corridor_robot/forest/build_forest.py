@@ -237,7 +237,7 @@ def build_forest(models_src, out_dir, params: dict, seed: int) -> dict:
     UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.z)
     root = UsdGeom.Xform.Define(stage, "/Forest")
     stage.SetDefaultPrim(root.GetPrim())
-    stage.GetRootLayer().customLayerData = {"generator": "wildfire_swarm.forest.build_forest", "seed": int(seed)}
+    stage.GetRootLayer().customLayerData = {"generator": "narrow_corridor_robot.forest.build_forest", "seed": int(seed)}
     _terrain_mesh(stage, hf, xs, ys)
     _lights(stage)
 

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from pxr import Sdf, Usd, UsdGeom, UsdShade
 
-from wildfire_swarm.assets.mirror import mirror_usd
+from narrow_corridor_robot.assets.mirror import mirror_usd
 
 
 def _layer(path: Path, build):
@@ -111,7 +111,7 @@ def test_missing_root_raises(server, tmp_path):
 
 def test_transient_network_error_is_retried(server, tmp_path, monkeypatch):
     import urllib.request
-    from wildfire_swarm.assets import mirror as m
+    from narrow_corridor_robot.assets import mirror as m
     real = urllib.request.urlopen
     calls = {"n": 0}
 
@@ -129,7 +129,7 @@ def test_transient_network_error_is_retried(server, tmp_path, monkeypatch):
 
 
 def test_search_path_names_are_looked_up_once(server, tmp_path, monkeypatch):
-    from wildfire_swarm.assets import mirror as m
+    from narrow_corridor_robot.assets import mirror as m
     seen_urls = []
     real = m._fetch
 

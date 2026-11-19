@@ -1,4 +1,4 @@
-# Wildfire Swarm: Isaac Sim 5.1
+# Narrow Corridor High Speed Robot: Isaac Sim 5.1
 
 One thermal Pegasus Iris UAV and four Nova Carter AMRs respond to wildfire hotspots in a procedurally
 generated forest. The stack is Isaac Sim 5.1.0, Pegasus Simulator v5.1.0 and an external ROS 2 Humble
@@ -10,7 +10,7 @@ caches, per-job results) follows the ROB6323 Go2 project.
 ## Repository structure
 
 ```
-wildfire_swarm/
+narrow_corridor_robot/
 ├── install.sh / install.slurm      # CPU setup job: pull Isaac Sim 5.1.0, build images, prepare assets
 ├── run.sh / run.slurm              # L40S runtime job: snapshot source, manifest, run the gates in order, copy results
 ├── config/
@@ -24,7 +24,7 @@ wildfire_swarm/
 ├── scripts/
 │   ├── cluster/                    # env, Apptainer wrappers, supervisor, manifest, asset preparation
 │   └── gates/                      # g1_startup, g3_scene
-├── source/wildfire_swarm/          # python package (forest exporter, asset mirror; later sensors, fire, mission)
+├── source/narrow_corridor_robot/          # python package (forest exporter, asset mirror; later sensors, fire, mission)
 ├── tests/                          # local unit tests
 └── tutorial/tutorial.md            # step-by-step cluster walkthrough
 ```
@@ -34,7 +34,7 @@ wildfire_swarm/
 Clone into your home directory: code belongs in backed-up `$HOME`, and large data goes to `/scratch`.
 
 ```bash
-cd $HOME && git clone <your-repo-url> wildfire && cd wildfire   # no config needed: account torch_pr_742
+cd $HOME && git clone <your-repo-url> narrow_corridor_robot && cd narrow_corridor_robot   # no config needed: account torch_pr_742
 ./install.sh                                    # CPU setup job (~1-1.5 h): images, assets, unit tests
 ./run.sh                                        # ONE job on ONE L40S: g1_startup -> g3_scene
 ```
@@ -43,7 +43,7 @@ Results land in `results/<jobid>_r0/`, and `results/latest` points to the newest
 your laptop:
 
 ```bash
-scp -r torch:wildfire/results/latest/g3 ./wildfire_g3
+scp -r torch:narrow_corridor_robot/results/latest/g3 ./ncr_g3
 ```
 
 The full walkthrough is in [tutorial/tutorial.md](tutorial/tutorial.md). It covers the pass rules, Open
@@ -57,7 +57,7 @@ OnDemand and VS Code downloads, and troubleshooting.
 | `./run.sh` | **1× L40S**, 10 cores, 32 GB RAM, time cap 25 min | G1 (containers) then G3 (scene with robots, 20 s of simulation recorded) in one allocation; the job ends as soon as G3 finishes, usually well under the cap |
 
 The job uses exactly one GPU (`--gres=gpu:1`). `install.sh` and `run.sh` refuse to submit while another of
-your wildfire jobs (setup or run) is queued or running. That way setup never rewrites the assets while a run job
+your project jobs (setup or run) is queued or running. That way setup never rewrites the assets while a run job
 reads them. A single gate can be run with `./run.sh g3_scene`. Host RAM is 20 GB for the
 start-up checks (Go2 sizing). The job requests 32 GB because the forest scene needs NVIDIA's minimum host RAM
 for Isaac Sim 5.1.
@@ -83,11 +83,11 @@ logs utilization and peak VRAM to `gpu_summary.json`. Torch cancels jobs with lo
 
 | Path | Contents |
 | --- | --- |
-| `$HOME/wildfire` | this repository and copied results (`results/`, git-ignored) |
-| `/scratch/$USER/wildfire_work/sif` | Apptainer images, digests and versions |
-| `/scratch/$USER/wildfire_work/assets` | localized forest and Nova Carter assets, `asset_manifest.json` |
-| `/scratch/$USER/wildfire_work/cache` | Kit, shader and compute caches |
-| `/scratch/$USER/wildfire_work/runs/<job>_r<n>` | per-job source snapshot, manifest, full logs |
+| `$HOME/narrow_corridor_robot` | this repository and copied results (`results/`, git-ignored) |
+| `/scratch/$USER/ncr_work/sif` | Apptainer images, digests and versions |
+| `/scratch/$USER/ncr_work/assets` | localized forest and Nova Carter assets, `asset_manifest.json` |
+| `/scratch/$USER/ncr_work/cache` | Kit, shader and compute caches |
+| `/scratch/$USER/ncr_work/runs/<job>_r<n>` | per-job source snapshot, manifest, full logs |
 
 Scratch is purged after 60 days without access. `./install.sh` (or `./install.sh --assets-only`) rebuilds it
 from the pinned sources. No conda or pip environments are created in `$HOME`: every Python dependency is

@@ -15,7 +15,7 @@ shell-check:
 	@if command -v shellcheck >/dev/null; then shellcheck -S error -s bash $(SHELL_FILES) && echo "shellcheck OK"; else echo "shellcheck not installed (skipped)"; fi
 
 py-check:
-	$(PY) -m py_compile scripts/cluster/*.py scripts/gates/*.py source/wildfire_swarm/wildfire_swarm/*/*.py && echo "py_compile OK"
+	$(PY) -m py_compile scripts/cluster/*.py scripts/gates/*.py source/narrow_corridor_robot/narrow_corridor_robot/*/*.py && echo "py_compile OK"
 
 config-check:
 	$(PY) -c "import yaml; d=yaml.safe_load(open('config/runtime.yaml')); r=d['rates']; assert r['physics_hz']==240 and r['render_hz']==60 and r['imu_report_hz']==60, r; assert r['physics_hz']//r['imu_report_hz']==4; assert d['pegasus']['commit']=='644da37e9d5268e5f9a34e78bdcfd57a8bab82b4'; yaml.safe_load(open('config/mission.yaml')); print('config OK')"

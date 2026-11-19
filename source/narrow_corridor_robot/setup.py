@@ -1,14 +1,14 @@
-"""Installation script for the 'wildfire_swarm' python package.
+"""Installation script for the 'narrow_corridor_robot' python package.
 
 Inside the cluster jobs the package is used from the read-only source snapshot via
 PYTHONPATH (scripts/cluster/isaac_exec.sh). For local development and tests:
 
-    pip install -e source/wildfire_swarm
+    pip install -e source/narrow_corridor_robot
 """
 from setuptools import find_packages, setup
 
 setup(
-    name="wildfire_swarm",
+    name="narrow_corridor_robot",
     version="0.1.0",
     description="Forest wildfire response with a Pegasus Iris UAV and Nova Carter AMRs in Isaac Sim 5.1",
     packages=find_packages(),

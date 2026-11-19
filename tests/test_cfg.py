@@ -31,3 +31,14 @@ def test_scalars_match_pyyaml():
 def test_missing_key_fails():
     code, out, _ = get("image.nope")
     assert code != 0 and out == ""
+
+
+def test_slurm_header_account_matches_runtime_config():
+    """install.slurm / run.slurm carry the account in their #SBATCH header (Go2 style);
+    it must stay equal to slurm.account in config/runtime.yaml."""
+    want = yaml.safe_load(YAML.read_text())["slurm"]["account"]
+    for job in ("install.slurm", "run.slurm"):
+        lines = (ROOT / job).read_text().splitlines()
+        accts = [l.split("=", 1)[1].strip() for l in lines if l.startswith("#SBATCH --account=")]
+        assert accts == [want], (job, accts)
+        assert not [l for l in lines if l.startswith("#SBATCH --partition")], job  # Torch: no manual partitions

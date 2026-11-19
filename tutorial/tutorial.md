@@ -1,4 +1,4 @@
-# Tutorial: running the wildfire swarm on Torch
+# Tutorial: running the Narrow Corridor High Speed Robot project on Torch
 
 Like the Go2 project, there are two kinds of job:
 
@@ -6,7 +6,7 @@ Like the Go2 project, there are two kinds of job:
 - **Run** (`./run.sh`): one job on **one** L40S GPU. It runs the gates one after another (G1 → G3) and
   stops at the first failure.
 
-Every job writes its evidence to `~/wildfire/results/<jobid>_r0/` and exits non-zero if its check fails.
+Every job writes its evidence to `~/narrow_corridor_robot/results/<jobid>_r0/` and exits non-zero if its check fails.
 Run the steps in order.
 
 ## 0. Connect and clone (login node, light work only)
@@ -19,8 +19,8 @@ Clone into your home directory. Torch backs up `$HOME`, but `/scratch` is not ba
 
 ```bash
 cd $HOME
-git clone <your-repo-url> wildfire
-cd wildfire
+git clone <your-repo-url> narrow_corridor_robot
+cd narrow_corridor_robot
 ```
 
 There is nothing to configure. Jobs use the project account `torch_pr_742` (set as `slurm.account` in
@@ -32,9 +32,9 @@ The project needs an **Active** allocation in [projects.hpc.nyu.edu](https://pro
 Only the PI can request one; ask for the **Torch** resource, which includes the L40S GPUs.
 
 Any folder name works for the clone, because the scripts find the repo from their own location. The paths
-below assume `~/wildfire`.
+below assume `~/narrow_corridor_robot`.
 
-Large data never goes in `$HOME`. Images, caches, assets and raw runs go to `/scratch/$USER/wildfire_work`.
+Large data never goes in `$HOME`. Images, caches, assets and raw runs go to `/scratch/$USER/ncr_work`.
 Nothing is pip- or conda-installed into `$HOME`: all Python packages live inside the container images.
 
 ## 1. Setup job (CPU only, about 1–1.5 h)
@@ -49,7 +49,7 @@ It prints the job ID and the exact command to follow the job, for example:
 
 ```
 Submitted setup job 4815162. Follow it (Ctrl+C stops watching, not the job):
-  tail -F /scratch/<netid>/wildfire_work/slurm_logs/install_4815162.out
+  tail -F /scratch/<netid>/ncr_work/slurm_logs/install_4815162.out
 ```
 
 Paste that `tail -F` line to watch the job live.
@@ -80,10 +80,10 @@ The summary is written to `results/install_<jobid>/summary.json`.
 ```bash
 ./run.sh                    # g1_startup -> g3_scene, same GPU, stops at first failure
 squeue --me                 # PD = queued, R = running
-tail -F /scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out   # run.sh prints this exact line
+tail -F /scratch/$USER/ncr_work/slurm_logs/run_<jobid>.out   # run.sh prints this exact line
 ```
 
-To rerun a single gate, use `./run.sh g3_scene`. While one of your wildfire jobs (setup or run) is queued or
+To rerun a single gate, use `./run.sh g3_scene`. While one of your project jobs (setup or run) is queued or
 running, `install.sh` and `run.sh` won't submit another. The sections below give each gate's pass rule.
 
 **How long it runs.** G3 simulates exactly 20 s (`video_seconds` in `config/mission.yaml`), writes the two
@@ -91,7 +91,7 @@ videos and exits. The job ends right then and frees the GPU. `--time` is only a 
 15 min for G3, 25 min total) so that a hung simulator never holds the GPU.
 
 The very first run is the slowest, because Isaac Sim compiles its shaders once and caches them in
-`/scratch/$USER/wildfire_work/cache`. If that first job hits the cap (`sacct` shows `TIMEOUT`), run
+`/scratch/$USER/ncr_work/cache`. If that first job hits the cap (`sacct` shows `TIMEOUT`), run
 `./run.sh` again: the cache is kept and later starts are much faster.
 
 ### G1: container startup
@@ -127,8 +127,8 @@ Pass, when every one of these is true in `g3/verdict.json`:
 At the end of each run job, the Slurm log prints the video paths:
 
 ```
-== video: /home/<netid>/wildfire/results/<jobid>_r0/g3/overview.mp4 (12M)
-== video: /home/<netid>/wildfire/results/<jobid>_r0/g3/chase.mp4 (11M)
+== video: /home/<netid>/narrow_corridor_robot/results/<jobid>_r0/g3/overview.mp4 (12M)
+== video: /home/<netid>/narrow_corridor_robot/results/<jobid>_r0/g3/chase.mp4 (11M)
 ```
 
 `results/latest` always points to the most recent run.
@@ -145,23 +145,23 @@ At the end of each run job, the Slurm log prints the video paths:
 **Option A: copy to your laptop with `scp`** (run on your laptop; uses the same `torch` SSH alias as login):
 
 ```bash
-scp -r torch:wildfire/results/latest/g3 ./wildfire_g3
+scp -r torch:narrow_corridor_robot/results/latest/g3 ./ncr_g3
 ```
 
 or a single file:
 
 ```bash
-scp torch:wildfire/results/<jobid>_r0/g3/overview.mp4 .
+scp torch:narrow_corridor_robot/results/<jobid>_r0/g3/overview.mp4 .
 ```
 
 For large or many files, use the data transfer node `dtn.torch.hpc.nyu.edu` instead of the login node.
 
 **Option B: Open OnDemand.** Log in to Torch Open OnDemand
 ([guide](https://services.rt.nyu.edu/docs/hpc/ood/ood_intro/)), open **Files → Home Directory →
-wildfire/results/<jobid>_r0/g3/**, then select `overview.mp4` and click **Download**. The browser can
+narrow_corridor_robot/results/<jobid>_r0/g3/**, then select `overview.mp4` and click **Download**. The browser can
 also play it directly.
 
-**Option C: VS Code Remote-SSH.** Open `~/wildfire/results/latest/g3/` in the Explorer, then right-click
+**Option C: VS Code Remote-SSH.** Open `~/narrow_corridor_robot/results/latest/g3/` in the Explorer, then right-click
 `overview.mp4` and choose **Download…**.
 
 `results/` is git-ignored, so videos and run files never end up in the repository. Each run's video pair is about 20–40 MB in
@@ -172,9 +172,9 @@ longer need.
 
 | What | Where |
 | --- | --- |
-| Slurm output | `/scratch/$USER/wildfire_work/slurm_logs/run_<jobid>.out` (gates are marked `== gate ... start/exit`) |
-| Child process logs | `results/<job>_r0/*.log.tail`; full logs in `wildfire_work/runs/<job>_r0/logs/` |
-| Exact code that ran | `wildfire_work/runs/<job>_r0/src/` (snapshot of the committed `HEAD`) |
+| Slurm output | `/scratch/$USER/ncr_work/slurm_logs/run_<jobid>.out` (gates are marked `== gate ... start/exit`) |
+| Child process logs | `results/<job>_r0/*.log.tail`; full logs in `ncr_work/runs/<job>_r0/logs/` |
+| Exact code that ran | `ncr_work/runs/<job>_r0/src/` (snapshot of the committed `HEAD`) |
 | Job state and exit reason | `sacct -j <jobid> --format=JobID,State,ExitCode,Elapsed,MaxRSS,ReqTRES` |
 
 If a job shows `CANCELLED` and `gpu_summary.json` shows low `util_mean_pct`, Torch's low-GPU-utilization

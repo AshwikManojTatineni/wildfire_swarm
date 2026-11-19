@@ -4,20 +4,20 @@
 #
 #   supervise.sh NAME1 'cmd1' [NAME2 'cmd2' ...]
 #
-# Each child's stdout/stderr -> $WF_RUN_DIR/logs/NAME.log.
+# Each child's stdout/stderr -> $NCR_RUN_DIR/logs/NAME.log.
 # Exit code: the first non-zero child code; 0 once every child exits 0;
 # 143 when the supervisor itself receives TERM/INT (e.g. scancel, time limit).
 # On a failure or signal the remaining children get TERM, then KILL after
-# WF_GRACE_S seconds (default 15).
+# NCR_GRACE_S seconds (default 15).
 set -uo pipefail
 
 if (( $# < 2 || $# % 2 != 0 )); then
   echo "usage: supervise.sh NAME 'command' [NAME 'command' ...]" >&2
   exit 2
 fi
-: "${WF_RUN_DIR:?WF_RUN_DIR must be set}"
-GRACE="${WF_GRACE_S:-15}"
-mkdir -p "$WF_RUN_DIR/logs"
+: "${NCR_RUN_DIR:?NCR_RUN_DIR must be set}"
+GRACE="${NCR_GRACE_S:-15}"
+mkdir -p "$NCR_RUN_DIR/logs"
 
 declare -a NAMES=() PIDS=()
 USE_SETSID=0; command -v setsid >/dev/null 2>&1 && USE_SETSID=1
@@ -52,9 +52,9 @@ trap on_signal TERM INT
 while (( $# )); do
   name="$1" cmd="$2"; shift 2
   if (( USE_SETSID )); then
-    setsid -w bash -c "$cmd" >"$WF_RUN_DIR/logs/$name.log" 2>&1 &
+    setsid -w bash -c "$cmd" >"$NCR_RUN_DIR/logs/$name.log" 2>&1 &
   else
-    bash -c "$cmd" >"$WF_RUN_DIR/logs/$name.log" 2>&1 &
+    bash -c "$cmd" >"$NCR_RUN_DIR/logs/$name.log" 2>&1 &
   fi
   NAMES+=("$name"); PIDS+=("$!")
   log "started $name (pid $!)"
